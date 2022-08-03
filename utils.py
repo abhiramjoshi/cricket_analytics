@@ -13,6 +13,11 @@ import pandas as pd
 from copy import deepcopy
 import pickle
 from codebase.settings import DATA_LOCATION
+import configparser
+
+config = configparser.ConfigParser()
+config.read('.config')
+
 LOGDIR = './logs'
 
 if not os.path.exists(LOGDIR):
