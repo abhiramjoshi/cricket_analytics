@@ -273,6 +273,26 @@ def _get_player_contribution(player_id:str or int, _match:match.MatchData, _type
     if i:
         comms.loc[i] = runout_nonstrikers_df
 
+    # Add batsman ball faced number in df and also bowler total balls bowled until this point
+    try:
+        inning_numbers = [i for i in set(comms['inningNumber'])]
+        inning_num_index = 0
+        contr_index = 1
+        for i,row in comms.iterrows():
+            if row.inningNumber != inning_numbers[inning_num_index]:
+                contr_index = 1
+                inning_num_index += 1
+
+            if int(player_id) == int(row.batsmanPlayerId):
+                comms.at[i, 'batsmanBallsFaced'] = contr_index
+                # row['batsmanBallsFaced'] = contr_index
+                contr_index += 1
+            if int(player_id) == int(row.bowlerPlayerId):
+                comms.at[i, 'bowlerBallsBowled'] = contr_index
+                contr_index += 1
+    except ValueError:
+        pass
+
     if by_innings:
         try:
             comms = [comms[comms['inningNumber'] == j+1] for j, _ in enumerate(_match.innings_list) if not comms[comms['inningNumber'] == j+1].empty]
@@ -281,6 +301,7 @@ def _get_player_contribution(player_id:str or int, _match:match.MatchData, _type
         # for i, _ in enumerate(match.innings_list):
         #     _comms.append(comms[comms['inningNumber'] == i])
         # _comm
+    
     return comms
 
 def get_cricket_totals(player_id, matches, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False):
