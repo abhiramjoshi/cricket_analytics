@@ -193,6 +193,41 @@ def get_figures_from_scorecard(player_id, _match:match.MatchData, _type, is_obje
             batting_figures.append(inning_batting_figures)
         return batting_figures
 
+def analyse_batting_inning(contributuion):
+    runs = contributuion.batsmanRuns.sum()
+    dismissals = contributuion[contributuion.isWicket == True].count().isWicket
+    balls = contributuion.shape[0]
+    strike_rate = round((runs/balls)*100, 2)
+    dot_balls = contributuion[contributuion.batsmanRuns == 0.0].count().batsmanRuns
+    fours = contributuion[contributuion.isFour == True].count().isFour
+    sixes = contributuion[contributuion.isSix == True].count().isSix
+    average = runs/dismissals
+    _how_out = how_out(contributuion.iloc[-1].dismissalType)
+    total_balls_faced = contributuion.iloc[-1].batsmanBallsFaced
+    #In control, out of control
+    return {
+        'runs': runs,
+        'dismissals': dismissals,
+        'balls':balls,
+        'sr':strike_rate,
+        'average': average,
+        'dot_balls': dot_balls,
+        'fours': fours,
+        'sixes': sixes,
+        'how-out': _how_out,
+        'total_balls_faced': total_balls_faced
+    }
+
+def analyse_batting(contributions):
+    stats = []
+    for contribution in contributions:
+        stats.append(analyse_batting_inning(contribution))
+    
+    #do analysis
+
+    return stats
+
+
 def check_runout_while_nonstriker(commentary_df:pd.DataFrame, player_id, match_object, is_object_id = False):
     if is_object_id:
         player_id = get_player_map(match_object, 'player_id', 'object_id')[int(player_id)]
