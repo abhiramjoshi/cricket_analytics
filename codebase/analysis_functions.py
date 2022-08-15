@@ -1,4 +1,5 @@
 from collections import defaultdict
+from os import stat
 import codebase.match_data as match
 import codebase.web_scrape_functions as wsf
 import numpy as np
@@ -194,16 +195,26 @@ def get_figures_from_scorecard(player_id, _match:match.MatchData, _type, is_obje
         return batting_figures
 
 def analyse_batting_inning(contributuion):
+    def safe_divide(numerator, denominator, _round=2):
+        try:
+            return round(numerator/denominator, 2)
+        except ZeroDivisionError:
+            return float('inf')
+
     runs = contributuion.batsmanRuns.sum()
     dismissals = contributuion[contributuion.isWicket == True].count().isWicket
     balls = contributuion.shape[0]
-    strike_rate = round((runs/balls)*100, 2)
+    strike_rate = safe_divide(runs, balls)
     dot_balls = contributuion[contributuion.batsmanRuns == 0.0].count().batsmanRuns
     fours = contributuion[contributuion.isFour == True].count().isFour
     sixes = contributuion[contributuion.isSix == True].count().isSix
-    average = runs/dismissals
+    average = safe_divide(runs, dismissals)
     _how_out = how_out(contributuion.iloc[-1].dismissalType)
     total_balls_faced = contributuion.iloc[-1].batsmanBallsFaced
+    fours_per_ball = safe_divide(fours, balls)
+    sixes_per_ball = safe_divide(sixes, balls)
+    dots_per_ball = safe_divide(dot_balls, balls)
+    
     #In control, out of control
     return {
         'runs': runs,
@@ -215,17 +226,39 @@ def analyse_batting_inning(contributuion):
         'fours': fours,
         'sixes': sixes,
         'how-out': _how_out,
-        'total_balls_faced': total_balls_faced
+        'total_balls_faced': total_balls_faced,
+        'fours_per_ball': fours_per_ball,
+        'sixes_per_ball': sixes_per_ball,
+        'dots_per_ball': dots_per_ball
     }
+
+def aggregate_batting_analysis(batting_stats):
+    """Takes list of batting stat objects and returns aggregate stats"""
+    averages = {}
+    totals = {}
+    keys = list(batting_stats[0].keys())
+    for key in keys:
+        try:
+            total = sum([i[key] for i in batting_stats])
+            av = total/len(batting_stats)
+            totals[key] = total
+            averages[key] = round(av,2)
+        except TypeError as e:
+            pass
+        except ZeroDivisionError:
+            av = float('inf')
+
+    
+    return averages, totals
 
 def analyse_batting(contributions):
     stats = []
     for contribution in contributions:
         stats.append(analyse_batting_inning(contribution))
     
-    #do analysis
+    averages, totals = aggregate_batting_analysis(stats)
 
-    return stats
+    return averages, totals, stats
 
 
 def check_runout_while_nonstriker(commentary_df:pd.DataFrame, player_id, match_object, is_object_id = False):
@@ -423,7 +456,7 @@ def _cricket_totals(player_id, m:match.MatchData, _type='both', by_innings=False
             for batting_df in batting_dfs:
                 try:
                     not_out = not batting_df['isWicket'].iloc[-1]
-                    balls_faced = batting_df[batting_df.batsmanPlayerId == player_id].shape[0]
+                    balls_faced = batting_df[(batting_df.batsmanPlayerId == player_id) & (batting_df.wides == 0)].shape[0]
                     batting_df_agg = batting_df[batting_df.batsmanPlayerId == player_id].sum()
                     inning = batting_df['inningNumber'].iloc[0]
                     inning_batting_figures = {
@@ -432,7 +465,7 @@ def _cricket_totals(player_id, m:match.MatchData, _type='both', by_innings=False
                         'balls_faced': balls_faced,
                         'fours': batting_df_agg['isFour'],
                         'six': batting_df_agg['isSix'],
-                        'dot_balls': (batting_df[batting_df.batsmanPlayerId == player_id]['bowlerRuns'] == 0).sum(),
+                        'dot_balls': (batting_df[(batting_df.batsmanPlayerId == player_id) & (batting_df.wides == 0)]['bowlerRuns'] == 0).sum(),
                         'not_out': not_out,
                         'how_out': how_out(batting_df.iloc[-1].dismissalType, keep_code=keep_dismissal_codes)
                     }
