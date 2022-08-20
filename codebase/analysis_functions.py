@@ -1,5 +1,4 @@
 from collections import defaultdict
-from os import stat
 import codebase.match_data as match
 import codebase.web_scrape_functions as wsf
 import numpy as np
@@ -14,7 +13,8 @@ from utils import logger
 from collections.abc import Iterable
 from datetime import datetime
 import espncricinfo.exceptions as cricketerrors
-
+import warnings
+from math import isnan
 
 
 def pre_transform_comms(match_object:match.MatchData):
@@ -34,6 +34,8 @@ def pre_transform_comms(match_object:match.MatchData):
     except KeyError:
         innings_map = {inning['innings_number']: inning['batting_team_id'] for inning in match_object.innings}
     df['battingTeam'] = df['inningNumber'].map(innings_map)
+    df['dismissedBatsman'] = df['batsmanPlayerId']
+    df.loc[df['isWicket'] == False, 'dismissedBatsman'] = None
     return df
 
 def how_out(dismissal_code, keep_code = False):
@@ -195,22 +197,28 @@ def get_figures_from_scorecard(player_id, _match:match.MatchData, _type, is_obje
         return batting_figures
 
 def analyse_batting_inning(contributuion):
+    player_id = contributuion.batsmanPlayerId.value_counts().index[0]
+
+
     def safe_divide(numerator, denominator, _round=2):
         try:
-            return round(numerator/denominator, 2)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                return round(numerator/denominator, 2)
         except ZeroDivisionError:
             return float('inf')
 
     runs = contributuion.batsmanRuns.sum()
-    dismissals = contributuion[contributuion.isWicket == True].count().isWicket
-    balls = contributuion.shape[0]
+    _how_out = how_out(contributuion.iloc[-1].dismissalType)
+    dismissals = bool(_how_out) #we assume that the dismissal is always at the end of an inning
+    # dismissals = contributuion[(contributuion.dismissedBatsman == player_id)&(contributuion.isWicket == True)].count().isWicket
+    balls = contributuion[(contributuion.batsmanPlayerId == player_id) & (contributuion.wides == 0)].shape[0]
     strike_rate = safe_divide(runs, balls)
     dot_balls = contributuion[contributuion.batsmanRuns == 0.0].count().batsmanRuns
     fours = contributuion[contributuion.isFour == True].count().isFour
     sixes = contributuion[contributuion.isSix == True].count().isSix
     average = safe_divide(runs, dismissals)
-    _how_out = how_out(contributuion.iloc[-1].dismissalType)
-    total_balls_faced = contributuion.iloc[-1].batsmanBallsFaced
+    total_balls_faced = contributuion.iloc[-1].batsmanBallsFaced if not isnan(contributuion.iloc[-1].batsmanBallsFaced) else contributuion.iloc[-2].batsmanBallsFaced
     fours_per_ball = safe_divide(fours, balls)
     sixes_per_ball = safe_divide(sixes, balls)
     dots_per_ball = safe_divide(dot_balls, balls)
@@ -234,6 +242,8 @@ def analyse_batting_inning(contributuion):
 
 def aggregate_batting_analysis(batting_stats):
     """Takes list of batting stat objects and returns aggregate stats"""
+    batting_stats = [x for x in batting_stats if x]
+    
     averages = {}
     totals = {}
     keys = list(batting_stats[0].keys())
@@ -254,6 +264,9 @@ def aggregate_batting_analysis(batting_stats):
 def analyse_batting(contributions):
     stats = []
     for contribution in contributions:
+        if len(contribution) == 0:
+            stats.append({})
+            continue
         stats.append(analyse_batting_inning(contribution))
     
     averages, totals = aggregate_batting_analysis(stats)
@@ -286,6 +299,7 @@ def check_runout_while_nonstriker(commentary_df:pd.DataFrame, player_id, match_o
         if player_name in wicket.dismissalText.lower():
             if 'run out' in wicket.dismissalText.lower():
                 if int(get_player_team(player_id, match_object)['team']) == int(wicket.battingTeam):
+                    wicket['dismissedBatsman'] = player_id
                     return i, wicket
         # if len(wicket.commentTextItems.split()) < 10:
         #     raise utils.NoMatchCommentaryError
