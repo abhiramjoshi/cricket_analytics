@@ -748,7 +748,67 @@ def get_dismissal_descriptions(commentary):
 
     return all_dismissals
 
-def search_for_keywords(text_items, keywords = [], exclude_words = [], return_matching = False, return_indices = False):
+def search_for_phrases(text_items, keywords = [], exclude_words = [], primary_keywords = [], threshold=0.5):
+    
+    def update_word_score(score, weight = None, exclude=False):
+        if exclude:
+            if not weight:
+                weight = -1
+            return max(0, score+weight)
+        
+        else:
+            if not weight:
+                weight = 0.5
+            return min(1, score+weight)
+    
+    scores = [0]*len(text_items)
+    indices = [0]*len(text_items)
+    logger.debug('Finding text with matching words %s', keywords)
+    logger.debug('Exluding text if contains %s', exclude_words)
+
+    for i, text in enumerate(text_items):
+        score = 0
+        dealt_with = False
+        for word in primary_keywords:
+            if isinstance(word, str):
+                word = (word, None)
+            if word[0] in text.lower():
+                logger.debug("Matching text: %s", text)
+                indices[i] = 1
+                score = 1
+                dealt_with = True
+        
+        if not dealt_with:
+            for word in keywords:
+                if isinstance(word, str):
+                    word = (word, None)
+                if word[0] in text.lower():
+                    try:
+                        score = update_word_score(score=score, weight=word[1])
+                    except TypeError:
+                        score = update_word_score(score=score)
+            
+            for word in exclude_words:
+                if isinstance(word, str):
+                    word = (word, None)
+                
+                if word[0] in text.lower():
+                    try:
+                        score = update_word_score(score=score, weight=word[1], exclude=True)
+                    except TypeError:
+                        score = update_word_score(score=score, exclude=True)
+                    if score == 0:
+                        break
+            
+            if score >= threshold:
+                indices[i] = 1
+
+        scores[i] = score
+    
+    return indices, scores
+
+
+def search_for_keywords(text_items, keywords = [], exclude_words = [], primary_keywords = [], return_matching = False, return_indices = False):
     """
     Searches for keywords in the text_item
     
@@ -760,23 +820,37 @@ def search_for_keywords(text_items, keywords = [], exclude_words = [], return_ma
     logger.debug('Finding text with matching words %s', keywords)
     logger.debug('Exluding text if contains %s', exclude_words)
     for i, text in enumerate(text_items):
-        for word in keywords:
+        dealt_with = False
+        for word in primary_keywords:
             if word in text.lower():
-                exclude = False
-                for e_word in exclude_words:
-                    if e_word in text.lower():
-                        exclude = True
-                        break
-                if exclude:
-                    logger.debug("Matching text with exlusion: %s", text)
-                    break
                 count += 1
                 logger.debug("Matching text: %s", text)
                 matching.append(text)
                 indices.append(i)
-                break
-            else:
-                logger.debug("No matches in text: %s", text)
+                dealt_with = True
+        
+        if not dealt_with:
+            for word in keywords:
+                if word in text.lower():
+                    exclude = False
+                    for e_word in exclude_words:
+                        if e_word in text.lower():
+                            exclude = True
+                            break
+                    if exclude:
+                        logger.debug("Matching text with exlusion: %s", text)
+                        break
+                    count += 1
+                    logger.debug("Matching text: %s", text)
+                    matching.append(text)
+                    indices.append(i)
+                    break
+                else:
+                    logger.debug("No matches in text: %s", text)
+        else:
+            dealt_with = False
+            continue
+
     return_object = [count]
     if return_matching:
         return_object.append(matching)
