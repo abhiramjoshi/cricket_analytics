@@ -754,6 +754,8 @@ def search_for_phrases(text_items, keywords = [], exclude_words = [], primary_ke
         if exclude:
             if not weight:
                 weight = -1
+            if weight > 0:
+                weight = -weight
             return max(0, score+weight)
         
         else:
