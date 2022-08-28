@@ -215,6 +215,10 @@ def analyse_batting_inning(contributuion):
     balls = contributuion[(contributuion.batsmanPlayerId == player_id) & (contributuion.wides == 0)].shape[0]
     strike_rate = safe_divide(runs, balls)
     dot_balls = contributuion[contributuion.batsmanRuns == 0.0].count().batsmanRuns
+    ones = contributuion[contributuion.batsmanRuns == 1.0].count().batsmanRuns
+    twos = contributuion[contributuion.batsmanRuns == 2.0].count().batsmanRuns
+    threes = contributuion[contributuion.batsmanRuns == 3.0].count().batsmanRuns
+    fives = contributuion[contributuion.batsmanRuns == 5.0].count().batsmanRuns
     fours = contributuion[contributuion.isFour == True].count().isFour
     sixes = contributuion[contributuion.isSix == True].count().isSix
     average = safe_divide(runs, dismissals)
@@ -231,7 +235,11 @@ def analyse_batting_inning(contributuion):
         'sr':strike_rate,
         'average': average,
         'dot_balls': dot_balls,
+        'ones': ones, 
+        'twos':twos,
+        'threes': threes, 
         'fours': fours,
+        'fives': fives,
         'sixes': sixes,
         'how-out': _how_out,
         'total_balls_faced': total_balls_faced,
