@@ -250,14 +250,14 @@ def analyse_batting_inning(contributuion):
 
 def aggregate_batting_analysis(batting_stats):
     """Takes list of batting stat objects and returns aggregate stats"""
-    batting_stats = [x for x in batting_stats if x]
+    batting_stats_ = [x for x in batting_stats if x] #this is wrong, this doesnt consider 0
     
     averages = {}
     totals = {}
-    keys = list(batting_stats[0].keys())
+    keys = list(batting_stats_[0].keys())
     for key in keys:
         try:
-            total = sum([i[key] for i in batting_stats])
+            total = sum([i[key] for i in batting_stats_])
             av = total/len(batting_stats)
             totals[key] = total
             averages[key] = round(av,2)
