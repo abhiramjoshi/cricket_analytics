@@ -758,6 +758,17 @@ def get_dismissal_descriptions(commentary):
 
 def search_for_phrases(text_items, keywords = [], exclude_words = [], primary_keywords = [], threshold=0.5):
     
+    def search_word(word, text, lower=True, no_punc=False):
+        if lower:
+            text = text.lower()
+        if no_punc:
+            text = text.translate(str.maketrans('', '', string.punctuation))
+        m = re.search(word, text)
+        if m:
+            return True
+        else:
+            return False
+
     def update_word_score(score, weight = None, exclude=False):
         if exclude:
             if not weight:
@@ -782,7 +793,7 @@ def search_for_phrases(text_items, keywords = [], exclude_words = [], primary_ke
         for word in primary_keywords:
             if isinstance(word, str):
                 word = (word, None)
-            if word[0] in text.lower():
+            if search_word(word[0], text):
                 logger.debug("Matching text: %s", text)
                 indices[i] = 1
                 score = 1
@@ -792,7 +803,7 @@ def search_for_phrases(text_items, keywords = [], exclude_words = [], primary_ke
             for word in keywords:
                 if isinstance(word, str):
                     word = (word, None)
-                if word[0] in text.lower():
+                if search_word(word[0], text):
                     try:
                         score = update_word_score(score=score, weight=word[1])
                     except TypeError:
@@ -802,7 +813,7 @@ def search_for_phrases(text_items, keywords = [], exclude_words = [], primary_ke
                 if isinstance(word, str):
                     word = (word, None)
                 
-                if word[0] in text.lower():
+                if search_word(word[0], text):
                     try:
                         score = update_word_score(score=score, weight=word[1], exclude=True)
                     except TypeError:
