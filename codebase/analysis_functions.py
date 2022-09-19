@@ -705,6 +705,10 @@ def percentagize_x_axis(data, _round = 2):
     return [round(x*(100/length), _round) for x in range(length)]
 
 def normalized_career_length(career_data:dict):
+    """
+    Takes a variable length career and normalizes it to the same length
+    Returns a df where columns indicate an individual career and rows are the percentage of the career completed
+    """
     #recent_form_df = {}
     #max_length = career_data.index(max(career_data, key=len))
     #index = set([i for data in career_data for i in percentagize_x_axis(data)])
@@ -808,6 +812,8 @@ def search_for_phrases(text_items, keywords = [], exclude_words = [], primary_ke
                         score = update_word_score(score=score, weight=word[1])
                     except TypeError:
                         score = update_word_score(score=score)
+                
+                #print(word, score)
             
             for word in exclude_words:
                 if isinstance(word, str):
@@ -818,6 +824,7 @@ def search_for_phrases(text_items, keywords = [], exclude_words = [], primary_ke
                         score = update_word_score(score=score, weight=word[1], exclude=True)
                     except TypeError:
                         score = update_word_score(score=score, exclude=True)
+                    #print(word, score)
                     if score == 0:
                         break
             
