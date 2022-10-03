@@ -40,7 +40,7 @@ def graph_multi_player_batting_careers(player_ids, dates=None, player_ages = Non
         except KeyError:
             all_stats[key] = None
 
-    graph_career_batting_summary(
+    graph_career_batting_summaries(
         recent_form=all_stats[keys[0]], 
         running_ave=all_stats[keys[1]], 
         innings_scores=all_stats[keys[2]],
@@ -48,7 +48,9 @@ def graph_multi_player_batting_careers(player_ids, dates=None, player_ages = Non
 
 
 
-def graph_career_batting_summary(recent_form=None, running_ave=None, innings_scores=None, x_label = None, y_label = None, barhue=None):
+def graph_career_batting_summaries(recent_form=None, running_ave=None, innings_scores=None, x_label = None, y_label = None, barhue=None):
+    """Graphs the batting summaries given a list of recent form, running average, and innings scores. Useful for graphing the batting summaries of a list of players on the same figure"""
+    
     combined_averages = {**{k:recent_form[k] for k in sorted(recent_form)}, **{f'{key}_rf':running_ave[key] for key in sorted(running_ave)}}
     k = len(combined_averages)//2
     fig, ax1 = plt.subplots(nrows=k, figsize=(18, k*5))
@@ -101,14 +103,15 @@ def get_career_batting_graph(player_id:str or int, _format:str = 'test', player_
     Gets player contributions between the dates provided and graphs the innings, running average and form average
     NOTE: player_id is object_id.
 
-    player-age: See career graph based on a segement of the players age. Format younger age:older age. 
+    player-age: See career graph based on a segement of the players age. Format younger age:older age.
+    dates: (optional) The dates between which the careers should be graphed, date format YYYY-MM-DD:YYYY-MM-DD
     """
     if player_age:
         dates = af.dates_from_age(player_id, player_age)
         
 
     logger.info('Getting match list for player, %s', player_id)
-    match_list = wsf.player_match_list(player_id, dates=dates, _format=_format)
+    match_list = wsf.get_player_match_list(player_id, dates=dates, _format=_format)
     logger.info('Getting player contributions for %s', player_id)
     innings = af.get_cricket_totals(player_id, match_list, _type='bat', by_innings=True, is_object_id=True)
     innings_df = pd.DataFrame(innings)
