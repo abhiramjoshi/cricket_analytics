@@ -31,8 +31,8 @@ def create_retry_session(total = None, connect = 3, backoff_factor = 0.5):
     session.mount('https://', adapter)
     return session
 
-def get_statsguru_player_url(player_id, _format):
-    return f'https://stats.espncricinfo.com/ci/engine/player/{player_id}.html?class={FORMATS[_format]};orderby=start;template=results;type=allround;view=match;wrappertype=text'
+def get_statsguru_player_url(player_id, _format, _type='allround'):
+    return f'https://stats.espncricinfo.com/ci/engine/player/{player_id}.html?class={FORMATS[_format]};orderby=start;template=results;type={_type};view=match;wrappertype=text'
 
 def get_statsguru_matches_url(year, _format):
     return f"https://stats.espncricinfo.com/ci/engine/records/team/match_results.html?class={FORMATS[_format]};id={year};type=year"
@@ -321,3 +321,21 @@ def get_player_json(player_id):
         raise utils.PlayerNotFoundError
     else:
         return response.json()
+
+def get_player_career_stats(player_id, _format='test'):
+    logger.info("Getting career stats for player: %s", player_id)
+    batting_url = get_statsguru_player_url(player_id, _format, _type='batting')
+    bowling_url = get_statsguru_player_url(player_id, _format, _type='bowling')
+    fielding_url = get_statsguru_player_url(player_id, _format, _type='fielding')
+    batting_table = read_statsguru(batting_url, table_name='Career averages')[0]
+    batting_table.columns = ['remove'] + batting_table.columns.to_list()[1:]
+    batting_table = batting_table[batting_table.columns.to_list()[1:-1]]
+    bowling_table = read_statsguru(bowling_url, table_name='Career averages')[0]
+    bowling_table = bowling_table[bowling_table.columns.to_list()[1:-1]]
+    fielding_table = read_statsguru(fielding_url, table_name='Career averages')[0]
+    fielding_table = fielding_table[fielding_table.columns.to_list()[1:-1]]
+    stats = {}
+    for table, _type in [(batting_table, 'bat'), (bowling_table, 'bowl'), (fielding_table, 'field')]:
+        for key in table.columns:
+            stats[f'{_type}_{key}'] = table[key][0]
+    return stats
