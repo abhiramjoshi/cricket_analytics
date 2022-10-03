@@ -1,5 +1,6 @@
 import codebase.graphing_manim as gm
 import codebase.analysis_functions as af
+import codebase.web_scrape_functions as wsf
 from manim import *
 import os
 from utils import DATA_LOCATION
@@ -16,7 +17,12 @@ PLAYER_IDS = [
     WILLIAMSON_PLAYER_ID,
     SPD_SMITH_ID
 ]
-#y_values = [[j*i for j in range(50)] for i in range(4)]
+
+kohli_stats = wsf.get_player_career_stats(KOHLI_ID)
+# kohli_totals = af.get_cricket_totals(KOHLI_ID, is_object_id=True)
+# root_totals = af.get_cricket_totals(ROOT_PLAYER_ID, is_object_id=True)
+# williamson_totals = af.get_cricket_totals(WILLIAMSON_PLAYER_ID, is_object_id=True)
+# smith_totals = af.get_cricket_totals(SPD_SMITH_ID, is_object_id=True)
 
 class Fab4Careers(Scene):
     
@@ -32,7 +38,7 @@ class Fab4Careers(Scene):
                 career_forms_fab4 = pickle.dump(career_forms_fab4, f)
 
         self._y_values = [career_forms_fab4['calculate_recent_form_average'][key] for key in career_forms_fab4['calculate_recent_form_average']]
-        self._x_values = [i for i in range(len(max(y_values, key=lambda x: len(x))))]
+        self._x_values = [i for i in range(len(max(self._y_values, key=lambda x: len(x))))]
 
     #x_values = [i for i in range(50)]
 
@@ -75,6 +81,7 @@ class Fab4Careers(Scene):
 
 if __name__ == "__main__":
     
-    scene = Fab4Careers()
-    scene.render()
+    print(kohli_stats)
+    #scene = Fab4Careers()
+    #scene.render()
 
