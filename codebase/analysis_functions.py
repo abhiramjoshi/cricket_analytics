@@ -394,7 +394,12 @@ def _get_player_contribution(player_id:str or int, _match:match.MatchData, _type
     
     return comms
 
-def get_cricket_totals(player_id, matches, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False):
+def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False):
+    if matches == None:
+        if is_object_id:
+            matches = wsf.get_player_match_list(player_id)
+        else:
+            raise Exception('Match list not provided. Note: If player id is not object id, match list must be provided')
     if not isinstance(matches, Iterable):
         matches = [matches]
     
@@ -685,6 +690,8 @@ def get_recent_form_average(player_id, innings=None, match_list=None, window_siz
     return average
 
 def get_player_team(player_id, _match:match.MatchData, is_object_id=False):
+    """Returns a dict indicating the given players team and the opposition"""
+    
     if is_object_id:
         map_id = 'object_id'
     else:
@@ -718,6 +725,26 @@ def normalized_career_length(career_data:dict):
     return full_df
 
 def apply_aggregate_func_to_list(player_id_list, _funcs, player_ages=None, dates = None, return_innings = False, disable_logging=True, **kwargs):
+    """
+    Apply an aggregation function such as running average, to a list of players, returns a df of the aggregate functions
+    
+    player_id_list: list of player ids, these should be cricinfo object IDs
+    dates: (optional) The dates between which the careers should be graphed, date format YYYY-MM-DD:YYYY-MM-DD
+    player_ages: (optional) Retrieve stats for player when they are within a certain age range Format Start Age:End Age
+    return_innings: Returns the innings objects as well as the calculated stats
+    disable_logging: Disables logging during the execution of the function
+    **kwargs: To be passed to the aggregate functions
+
+    Returns: Dict of results:
+    {
+        function_name:{
+            player_id:agg_function_result
+        },
+        'innings_totals':{
+            player_id:innings_df
+        }
+    }
+    """
     if player_ages:
         if not isinstance(player_ages, list):
             player_ages = [player_ages]
