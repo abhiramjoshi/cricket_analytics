@@ -197,8 +197,10 @@ def get_figures_from_scorecard(player_id, _match:match.MatchData, _type, is_obje
         return batting_figures
 
 def analyse_batting_inning(contributuion):
-    player_id = contributuion.batsmanPlayerId.value_counts().index[0]
-
+    try:
+        player_id = contributuion.batsmanPlayerId.value_counts().index[0]
+    except IndexError:
+        player_id = None
 
     def safe_divide(numerator, denominator, _round=2):
         try:
@@ -209,7 +211,10 @@ def analyse_batting_inning(contributuion):
             return float('inf')
 
     runs = contributuion.batsmanRuns.sum()
-    _how_out = how_out(contributuion.iloc[-1].dismissalType)
+    try:
+        _how_out = how_out(contributuion.iloc[-1].dismissalType)
+    except IndexError:
+        _how_out = False
     dismissals = bool(_how_out) #we assume that the dismissal is always at the end of an inning
     # dismissals = contributuion[(contributuion.dismissedBatsman == player_id)&(contributuion.isWicket == True)].count().isWicket
     balls = contributuion[(contributuion.batsmanPlayerId == player_id) & (contributuion.wides == 0)].shape[0]
@@ -222,7 +227,10 @@ def analyse_batting_inning(contributuion):
     fours = contributuion[contributuion.isFour == True].count().isFour
     sixes = contributuion[contributuion.isSix == True].count().isSix
     average = safe_divide(runs, dismissals)
-    total_balls_faced = contributuion.iloc[-1].batsmanBallsFaced if not isnan(contributuion.iloc[-1].batsmanBallsFaced) else contributuion.iloc[-2].batsmanBallsFaced
+    try:
+        total_balls_faced = contributuion.iloc[-1].batsmanBallsFaced if not isnan(contributuion.iloc[-1].batsmanBallsFaced) else contributuion.iloc[-2].batsmanBallsFaced
+    except IndexError:
+        total_balls_faced = 0
     fours_per_ball = safe_divide(fours, balls)
     sixes_per_ball = safe_divide(sixes, balls)
     dots_per_ball = safe_divide(dot_balls, balls)
