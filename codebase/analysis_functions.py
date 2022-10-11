@@ -925,3 +925,37 @@ def search_for_keywords(text_items, keywords = [], exclude_words = [], primary_k
     else:
         return_object.append(None)
     return tuple(return_object)
+
+def cumulative_sr(inning_comms:pd.DataFrame):
+    tot_runs = 0
+    tot_balls = 0
+
+    cum_sr = []
+
+    for i, row in inning_comms.iterrows():
+        tot_runs += row.batsmanRuns
+        if not row.wides or not row.noballs:
+            tot_balls += 1
+
+        sr = tot_runs/tot_balls
+        cum_sr.append(sr)
+    
+    return cum_sr
+
+def average_elements_of_list(list_of_lists:list[list]):
+    max_length = len(max(list_of_lists, key=lambda x: len(x)))
+
+    averaged_list = []
+    for i in range(max_length):
+        element_tot = 0
+        element_count = 0
+        for _list in list_of_lists:
+            try:
+                element_tot += _list[i]
+                element_count += 1
+            except IndexError:
+                pass
+        
+        averaged_list.append(element_tot/element_count)
+
+    return averaged_list
