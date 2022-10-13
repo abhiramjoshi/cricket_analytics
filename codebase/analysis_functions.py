@@ -9,12 +9,14 @@ import seaborn as sns
 import re
 import string
 import utils
-from utils import logger
+from utils import FiguresInDB, logger
 from collections.abc import Iterable
 from datetime import datetime
 import espncricinfo.exceptions as cricketerrors
 import warnings
 from math import isnan
+from sqlalchemy.orm import sessionmaker
+from models import engine, PlayerMatchStats, Match
 
 
 def pre_transform_comms(match_object:match.MatchData):
@@ -125,6 +127,24 @@ def graph_seaborn_barplot(data, x, y, hue=None):
     bar.set_xticklabels(bar.get_xticklabels(), rotation=90);
     plt.setp(ax.patches, linewidth=0)
 
+def get_player_team(player_id, _match:match.MatchData, is_object_id=False):
+    """Returns a dict indicating the given players team and the opposition"""
+    
+    if is_object_id:
+        map_id = 'object_id'
+    else:
+        map_id = 'player_id'
+
+    team_1 = [int(player[map_id]) for player in _match.team_1_players]
+    team_2 = [int(player[map_id]) for player in _match.team_2_players]
+    
+    if int(player_id) in team_1:
+        return {'team': _match.team_1_id, 'opposition': _match.team_2_id}
+    elif int(player_id) in team_2:
+        return {'team': _match.team_2_id, 'opposition': _match.team_1_id}
+    else:
+        raise utils.PlayerNotPartOfMatch('Player not part of match')
+
 def get_aggregates(match_object: match.MatchData, event):
     events = {
         'bat-runs':('batsmanRuns', 'batsman', 2),
@@ -149,6 +169,74 @@ def get_aggregates(match_object: match.MatchData, event):
     graph_seaborn_barplot(event_df, event_df.columns[0],event_df.columns[1])
 
     return event_df
+
+def get_match_details_from_db(_match:match.MatchData or int):
+    if isinstance(_match, match.MatchData):
+        _match = _match.match_id
+
+    Session = sessionmaker(bind=engine)
+    with Session() as session:
+        _match = session.query(Match).filter_by(match_id=_match).all()
+    if _match:
+        _match = utils.object_as_dict(_match[0])
+
+        _match_dict = {
+            'date':_match['date'],
+            'teams':[_match['team_1_players'], _match['team_2_players']],
+            'team_1':_match['team_1'],
+            'team_2':_match['team_2'],
+            'continent':_match['continent'],
+            'ground':_match['ground']
+        }
+
+        return _match_dict
+
+def get_figures_from_db(player_id, _match:match.MatchData or int, _type, is_object_id = False):
+    """Get figures from DB, player id must not be object id"""
+    if isinstance(_match, match.MatchData):
+        _match = _match.match_id
+    
+    if is_object_id:
+        PLAYER_SEARCH = {'player_object_id':player_id}
+    else:    
+        PLAYER_SEARCH = {'player_id':player_id}
+
+    Session = sessionmaker(bind=engine)
+    with Session() as session:
+        figures = session.query(PlayerMatchStats).filter_by(**PLAYER_SEARCH).filter_by(match_id=_match).all()
+
+    if _type == 'bat':
+        batting_figures = []
+        for row in figures:
+            row = utils.object_as_dict(row)
+            row_dict = {
+                'inning': row['inning'],
+                'runs': row['bat_runs'],
+                'balls_faced': row['balls_faced'],
+                'fours': row['bat_fours'],
+                'six': row['bat_sixes'],
+                'dot_balls': row['bat_dot_balls'],
+                'not_out': row['not_out'],
+                'how_out': row['how_out']   
+            }
+            batting_figures.append(row_dict)
+        return batting_figures 
+        
+    if _type == 'bowl':
+        bowling_figures = []
+        for row in figures:
+            row = utils.object_as_dict(row)
+            row_dict = {
+                'inning':row['inning'],
+                'overs': row['bowl_overs'],
+                'runs': row['bowl_runs'],
+                'dot_balls': row['bowl_dot_balls'],
+                'wides': row['bowl_wides'],
+                'noballs': row['bowl_noballs'],
+                'wickets': row['wickets']
+            }
+            bowling_figures.append(row_dict)
+        return bowling_figures
 
 def get_figures_from_scorecard(player_id, _match:match.MatchData, _type, is_object_id=False):
     if not is_object_id: #Change to object ID
@@ -195,6 +283,109 @@ def get_figures_from_scorecard(player_id, _match:match.MatchData, _type, is_obje
                 }
             batting_figures.append(inning_batting_figures)
         return batting_figures
+
+def save_player_stats_to_db(stats, player_id, _match:match.MatchData or int, is_object_id=True):
+
+    match_id = _match
+    if isinstance(_match, match.MatchData):
+        match_id = _match.match_id
+
+    logger.info("Saving player stats to DB")
+
+    KEY_MAP_BAT = {
+        'runs':'bat_runs',
+        'fours':'bat_fours',
+        'six':'bat_sixes',
+        'dot_balls':'bat_dot_balls',
+    }
+    
+    KEY_MAP_BOWL = {
+        'runs':'bowl_runs',
+        'overs':'bowl_overs',
+        'dot_balls':'bowl_dot_balls',
+        'wides':'bowl_wides',
+        'noballs':'bowl_noballs'
+    }
+
+    _type = stats.pop('type')
+
+    if _type == 'bat':
+        mapping = KEY_MAP_BAT
+    if _type == 'bowl':
+        mapping = KEY_MAP_BOWL
+
+    stats_c = stats.copy()
+    for key in stats:
+        if key in mapping:
+            val = stats_c.pop(key)
+            stats_c[mapping[key]] = val
+    stats = stats_c
+
+    logger.info('Opening DB session to %s', engine)
+    Session = sessionmaker(bind=engine)
+    with Session() as session:
+        if not session.query(Match).filter_by(match_id = match_id).all():
+            match_object = Match(
+                match_id = int(stats['match_id']),
+                match_title = f"{_match.series_name}-{_match.match_title}",
+                date = stats.pop('date'),
+                team_1 = int(_match.team_1['team_id']),
+                team_2 = int(_match.team_2['team_id']),
+                team_1_players = str([player['player_id'] for player in _match.team_1_players]),
+                team_2_players = str([player['player_id'] for player in _match.team_2_players]),
+                ground = int(stats.pop('ground')),
+                continent = stats.pop('continent'),
+                match_url = _match.match_url,
+                result = _match.result,
+                total_innings = len(_match.innings_list),
+                toss = int(_match.toss_winner),
+                match_winner = int({
+                    _match.team_1['team_abbreviation']:_match.team_1['team_id'],
+                    _match.team_2['team_abbreviation']:_match.team_2['team_id'],
+                }[_match.match_winner]),
+                status = _match.status
+            )
+            session.add(match_object)
+        else:
+            stats.pop('date')
+            stats.pop('ground')
+            stats.pop('continent')
+
+        for key in stats:
+            try:
+                if key == 'bowl_overs':
+                    continue
+                stats[key] = int(stats[key])
+            except (ValueError, TypeError):
+                pass
+
+        stats.pop('team')
+        stats.pop('opposition')
+
+        if is_object_id:
+            PLAYER_SEARCH = {'player_object_id':player_id}
+        else:    
+            PLAYER_SEARCH = {'player_id':player_id}
+
+        logger.info("Checking if innings entry exists")
+        if not session.query(PlayerMatchStats).filter_by(**PLAYER_SEARCH).filter_by(match_id=match_id).filter_by(inning=stats['inning']).all():
+            # Logically you should only reach this part of the stats if the DB is not being queried,
+            # in which case the match object is available and the player map can be executed.
+
+            if is_object_id: #Change from object id to player id
+                player_object_id = player_id
+                player_id = int(get_player_map(_match, 'player_id', 'object_id')[int(player_object_id)])
+            else:
+                player_object_id = int(get_player_map(_match, 'object_id', 'player_id')[int(player_id)])
+            
+            stat_id = f"{player_id}{_match.match_id}{stats['inning']}"
+            db_object = PlayerMatchStats(**{
+                **{'stat_id':int(stat_id), 'player_id':int(player_id), 'player_object_id':int(player_object_id)},
+                **stats
+            })
+            session.add(db_object)
+        session.commit()
+
 
 def analyse_batting_inning(contributuion):
     try:
@@ -350,6 +541,9 @@ def _get_player_contribution(player_id:str or int, _match:match.MatchData, _type
     """
     Get player innings from a match commentary
     """
+    if not isinstance(_match, match.MatchData):
+        _match = match.MatchData(_match)
+
     if is_object_id:
         player_id = {player['object_id']:player['player_id'] for player in _match.all_players}[int(player_id)]
 
@@ -402,7 +596,7 @@ def _get_player_contribution(player_id:str or int, _match:match.MatchData, _type
     
     return comms
 
-def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False):
+def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False, save=True, try_local=True):
     if matches == None:
         if is_object_id:
             matches = wsf.get_player_match_list(player_id)
@@ -414,44 +608,92 @@ def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, 
     contributions = []
 
     for _match in matches:
-        logger.info('Getting player controbutions for match %s', _match)
+        logger.info('Getting player contributions for match %s', _match)
         try:
-            if not isinstance(_match, match.MatchData):
-                _match = match.MatchData(_match)
-            contribution = _cricket_totals(player_id, _match, _type, by_innings, is_object_id, from_scorecards=from_scorecards, keep_dismissal_codes=keep_dismissal_codes)
+            contribution = _cricket_totals(player_id, _match, _type, by_innings, is_object_id, from_scorecards=from_scorecards, keep_dismissal_codes=keep_dismissal_codes, try_local=try_local)
             if _type == 'both':
                 for i,inning in enumerate(contribution['bat']+contribution['bowl']):
-                    contributions.append({**inning, **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}})
+                    if 'wickets' in inning: #Need know if the contribution is batting or bowling
+                        contr_type = 'bowl'
+                    else:
+                        contr_type = 'bat'
+                    stats = {**inning, **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}, **{'type':contr_type}}
+                    contributions.append(stats)
+                    if save:
+                        save_player_stats_to_db(stats, player_id, _match, is_object_id)
                     # contributions.append({**contribution['bowl'], **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}})
             else:
                 for i,inning in enumerate(contribution[_type]):
-                    contributions.append({**inning, **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}})
+                    contributions.append({**inning, **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}}, **{'type':_type})
+                    if save:
+                        save_player_stats_to_db(stats, player_id, _match, is_object_id)
         except cricketerrors.MatchNotFoundError:
             logger.warning('Match ID: %s not found', _match)
     return contributions
 
-def _cricket_totals(player_id, m:match.MatchData, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False):
+def _cricket_totals(player_id, m:match.MatchData or int, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False, try_local=True):
     """
     Get the cricketing totals for the players. I.e. their stats in the collected innings.
     """
-    logger.info("Getting player totals for match: %s Player: %s", m.match_id, player_id)
-    if is_object_id: #Change from object id to player id
-        player_id = int(get_player_map(m, 'player_id', 'object_id')[int(player_id)])
+    if not isinstance(m, match.MatchData):
+        if not try_local:
+            m = match.MatchData(m)
+    
+    try:
+        logger.info("Getting player totals for match: %s Player: %s", m.match_id, player_id)
+    except AttributeError:
+        logger.info("Getting player totals for match: %s Player: %s", m, player_id)
+
     batting_figures = None
     bowling_figures = None
+    
+    if try_local:
+        logger.info("Getting match details from DB")
+        _match = get_match_details_from_db(m)
+        if _match:
+            date = _match['date']
+            continent = _match['continent']
+            ground = _match['ground']
+            if str(player_id) in _match['teams'][0]:
+                team = _match['team_1']
+                opps = _match['team_2']
+            else:
+
+                team = _match['team_2']
+                opps = _match['team_1']
+        else:
+            logger.info("Match not found in DB, match and player data will be collected from JSON")
+            try_local = False
     # if player id in bowling id, update bowling figures
-    date = m.date
-    teams = get_player_team(player_id, m, is_object_id=False)
-    team = teams['team']
-    opps = teams['opposition']
-    continent = m.continent
-    ground = m.ground_id
+    if not try_local:
+        if is_object_id: #Change from object id to player id
+            player_id = int(get_player_map(m, 'player_id', 'object_id')[int(player_id)])
+        date = datetime.strptime(m.date, "%Y-%m-%d")
+        teams = get_player_team(player_id, m, is_object_id=False)
+        team = teams['team']
+        opps = teams['opposition']
+        continent = m.continent
+        ground = m.ground_id
 
     if _type != 'bat':
         bowling_figures = []
         try:
+            """Handle figures from DB"""
+            if try_local:
+                logger.info("Trying DB to retrieve bowling figures")
+                db_figures = get_figures_from_db(player_id, m, 'bowl', is_object_id=is_object_id)
+                if db_figures:
+                    for figures in db_figures:
+                        if figures['overs']:
+                            bowling_figures += db_figures
+                    raise utils.FiguresInDB
+                logger.info("Bowling figures not found in DB")
+
+            """Handle figures from scorecard"""
             if from_scorecards:
                 raise utils.NoMatchCommentaryError
+
+            """Handle figures from match JSON"""
             bowling_dfs = _get_player_contribution(player_id, m, 'bowl', by_innings=by_innings, is_object_id=(not is_object_id))
             if not by_innings:
                 bowling_dfs = pd.concat([bowling_dfs], ignore_index=True, axis=0)
@@ -469,20 +711,40 @@ def _cricket_totals(player_id, m:match.MatchData, _type='both', by_innings=False
                         'runs': bowling_df_agg['bowlerRuns'],
                         'dot_balls': (bowling_df['bowlerRuns'] == 0).sum(),
                         'wides': bowling_df_agg['wides'],
-                        'noballs': bowling_df_agg['noballs']
+                        'noballs': bowling_df_agg['noballs'],
+                        'wickets': bowling_df_agg['isWicket']
                     }
                     bowling_figures.append(inning_bowling_figures)
                 except IndexError:
                     continue
+
         except utils.NoMatchCommentaryError:
             logger.info("Getting bowling figures from scorecard")
             bowling_figures += get_figures_from_scorecard(player_id, m, 'bowl', is_object_id=(not is_object_id))
-    # else if player id in batting id, update batting figures
+        
+        except utils.FiguresInDB:
+            logger.info("Retrieved player bowling stats from DB")
+
     if _type != 'bowl':
         batting_figures = []
         try:
+
+            """Handle figures from DB"""
+            if try_local:
+                logger.info("Trying DB to retrieve batting figures")
+                db_figures = get_figures_from_db(player_id, m, 'bat', is_object_id=is_object_id)
+                if db_figures:
+                    for figures in db_figures:
+                        if figures['runs']:
+                            batting_figures += db_figures
+                    raise utils.FiguresInDB
+                logger.info("Batting figures not found in DB")
+            
+            """Handle figures from scorecard"""
             if from_scorecards:
                 raise utils.NoMatchCommentaryError
+            
+            """Handle figures from match JSON"""
             batting_dfs = _get_player_contribution(player_id, m, 'bat', by_innings=by_innings, is_object_id=(not is_object_id))
             if not by_innings:
                 batting_dfs = pd.concat([batting_dfs], ignore_index=True, axis=0)
@@ -510,8 +772,16 @@ def _cricket_totals(player_id, m:match.MatchData, _type='both', by_innings=False
         except utils.NoMatchCommentaryError:
             logger.info("Getting batting figures from scorecard")
             batting_figures += get_figures_from_scorecard(player_id, m, 'bat', is_object_id=(not is_object_id))
+        except utils.FiguresInDB:
+            logger.info("Retrieved player batting stats from DB")
+    
+    try:
         logger.debug("Match ID: %s\nBatting: %s\nBowling: %s",m.match_id, batting_figures, bowling_figures) 
-    return {'bat': batting_figures, 'bowl': bowling_figures, 'date':datetime.strptime(date, "%Y-%m-%d"),'team':team, 'opposition': opps, 'ground':ground, 'continent':continent, 'match_id': m.match_id}
+        return {'bat': batting_figures, 'bowl': bowling_figures, 'date':date,'team':team, 'opposition': opps, 'ground':ground, 'continent':continent, 'match_id': m.match_id}
+    except AttributeError:
+        logger.debug("Match ID: %s\nBatting: %s\nBowling: %s",m, batting_figures, bowling_figures)
+        return {'bat': batting_figures, 'bowl': bowling_figures, 'date':date,'team':team, 'opposition': opps, 'ground':ground, 'continent':continent, 'match_id': m}
+    
 
 def process_text_comms(df:pd.DataFrame, columns = ['dismissalText', 'commentPreTextItems', 'commentTextItems', 'commentPostTextItems', 'commentVideos']):
     for column in columns:
@@ -696,24 +966,6 @@ def get_recent_form_average(player_id, innings=None, match_list=None, window_siz
     innings_df = pd.DataFrame(innings)
     average = calculate_recent_form_average(innings_df, window_size=window_size)
     return average
-
-def get_player_team(player_id, _match:match.MatchData, is_object_id=False):
-    """Returns a dict indicating the given players team and the opposition"""
-    
-    if is_object_id:
-        map_id = 'object_id'
-    else:
-        map_id = 'player_id'
-
-    team_1 = [int(player[map_id]) for player in _match.team_1_players]
-    team_2 = [int(player[map_id]) for player in _match.team_2_players]
-    
-    if int(player_id) in team_1:
-        return {'team': _match.team_1_id, 'opposition': _match.team_2_id}
-    elif int(player_id) in team_2:
-        return {'team': _match.team_2_id, 'opposition': _match.team_1_id}
-    else:
-        raise utils.PlayerNotPartOfMatch('Player not part of match')
 
 def percentagize_x_axis(data, _round = 2):
     length = len(data)

@@ -8,9 +8,9 @@ from espncricinfo.match import Match
 from codebase.match_data import MatchData
 from pprint import pprint
 import codebase.analysis_functions as af
-TEST_MATCH_ID = '343730'
+TEST_MATCH_ID = '1320741'
 M = MatchData(TEST_MATCH_ID)
-PLAYER_ID = '50424'
+PLAYER_ID = '253802'
 
 def test_aggregate_fetch(m):
     return af.get_aggregates(m, 'bat-fours')
@@ -45,9 +45,12 @@ def test_get_figures_from_scorecard(player_id, match, _type):
 def test_runout_while_nonstriker(commentary_df, player_id, match_object, is_object_id = False):
     return af.check_runout_while_nonstriker(commentary_df=commentary_df, player_id=player_id, match_object=match_object, is_object_id=is_object_id)
 
+def db_interactions_test():
+    return af.get_cricket_totals(PLAYER_ID, 343730, by_innings=True, is_object_id=True, try_local=True)
+
 if __name__ == '__main__':
     start = timeit.default_timer()
-    commentary_df = af.pre_transform_comms(M)
+    #commentary_df = af.pre_transform_comms(M)
     # print(test_aggregate_fetch(M))
     #test_player_contributions(M, is_object_id=True, by_innings=True)
     # test_cricket_totals(PLAYER_ID, M, is_object_id=True, by_innings=True)
@@ -58,6 +61,8 @@ if __name__ == '__main__':
     # test_running_average(PLAYER_ID)
     # test_get_career_batting_graph(PLAYER_ID, dates='2020-01-01:')
     # print(test_get_figures_from_scorecard(PLAYER_ID, M, 'bat'))
+    totals = db_interactions_test()
+    print(totals)
     stop = timeit.default_timer()
     
     print('Time: ', abs(start-stop))

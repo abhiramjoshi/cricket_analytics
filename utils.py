@@ -1,3 +1,4 @@
+from sqlalchemy import inspect
 import itertools
 import logging
 import os
@@ -54,6 +55,9 @@ class NoMatchCommentaryError(Exception):
     pass
 
 class RetiredHurtError(Exception):
+    pass
+
+class FiguresInDB(Exception):
     pass
 
 class DenseTransformer(TransformerMixin):
@@ -275,3 +279,7 @@ def check_if_ipython():
         return True
     except NameError:
         return False
+
+def object_as_dict(obj):
+    return {c.key: getattr(obj, c.key)
+            for c in inspect(obj).mapper.column_attrs}

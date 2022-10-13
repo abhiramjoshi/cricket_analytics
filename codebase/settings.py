@@ -10,6 +10,11 @@ SCORECARDS = os.path.join(BASE_PATH, "data", "scorecards")
 CAREERS = os.path.join(BASE_PATH, "data", "careers")
 LABEL_DATA = os.path.join(BASE_PATH, "data", "labelled_data")
 
+DATABASE_TYPE = 'sqlite'
+DATABASE_LOCATION = os.path.join(BASE_PATH, 'data', 'cricket_data.db')
+
+print(DATABASE_LOCATION)
+
 paths = [
     DATA_LOCATION,
     FULL_COMMS,
