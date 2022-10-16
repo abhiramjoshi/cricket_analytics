@@ -9,7 +9,7 @@ from espncricinfo.match import Match
 from codebase.match_data import MatchData
 from pprint import pprint
 
-TEST_MATCH_ID = 352662
+TEST_MATCH_ID = 489228
 OLDEST_MATCH_ID = '62396'
 
 def test_full_comms_grab(matchId):
