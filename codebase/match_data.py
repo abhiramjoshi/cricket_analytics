@@ -1,4 +1,3 @@
-import operator
 import requests
 from espncricinfo.match import Match
 from requests_futures.sessions import FuturesSession
@@ -12,6 +11,7 @@ class MatchData(Match):
     def __init__(self, match_id, try_local=True, serialize=False, save=True, no_comms=False):
         super().__init__(int(match_id), try_local, serialize, save)
         self.all_players = self.team_1_players + self.team_2_players
+        self.codified_result = self.interpret_match_result()
         if not no_comms:
             self.detailed_comms_url = DETAILED_COMMS_BASE_URL.replace('{seriesid}', str(self.series_id)).replace('{matchid}', str(self.match_id))
             self.full_comms = self.get_detailed_comms_faster(try_local = try_local, save=save, serialize=serialize)
@@ -111,5 +111,30 @@ class MatchData(Match):
             return sorted(sorted(sorted(self.full_comms, key=lambda x: x['ballNumber']), key=lambda x: x['overNumber']), key=lambda x: x['inningNumber'])
         return [ball for innings in self.full_comms for ball in innings]
        
+    def interpret_match_result(self):
+        """Codifies the match result. Returns match result in format (Win Team, Lose Team, isDraw, Margin)"""
+        result = self.result.lower()
+        def get_margin(result_string:str):
+            margin = result_string.split('by')[1]
+            margin = margin.strip()
+            margin = margin.lstrip('an')
+            return margin
+        
+        if self.match_class == "Test":
+            if 'match drawn' in result:
+                return (None, None, True, None)
+            
+            if self.team_1['team_name'].lower() in result:
+                margin = get_margin(self.result)
+                return (int(self.team_1['team_id']), int(self.team_2['team_id']), False, margin)
+            
+            if self.team_2['team_name'].lower() in result:
+                margin = get_margin(self.result)
+                return (int(self.team_2['team_id']), int(self.team_1['team_id']), False, margin)
+            
+            return (None, None, False, self.result)
+                
+            
+
 if __name__ == '__main__':
     pass
