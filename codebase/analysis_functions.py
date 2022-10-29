@@ -139,7 +139,10 @@ def check_player_in_match(player_id, _match:match.MatchData, is_object_id=False)
     logger.info("Player in match")
 
 def get_player_team(player_id, _match:match.MatchData, is_object_id=False):
-    """Returns a dict indicating the given players team and the opposition"""
+    """
+    Returns a dict indicating the given players team and the opposition
+    return {'team': _match.team_1_id, 'opposition': _match.team_2_id}
+    """
     
     if is_object_id:
         map_id = 'object_id'
@@ -197,7 +200,9 @@ def get_match_details_from_db(_match:match.MatchData or int):
             'team_1':_match['team_1'],
             'team_2':_match['team_2'],
             'continent':_match['continent'],
-            'ground':_match['ground']
+            'ground':_match['ground'],
+            'result':_match['result'],
+            'total_innings':_match['total_innings']
         }
 
         return _match_dict
@@ -475,9 +480,9 @@ def analyse_batting_inning(contributuion):
         'dots_per_ball': dots_per_ball
     }
 
-def aggregate_batting_analysis(batting_stats):
+def aggregate_batting_analysis(batting_stats, cricket_runs_ave=True):
     """Takes list of batting stat objects and returns aggregate stats"""
-    batting_stats_ = [x for x in batting_stats if x] #this is wrong, this doesnt consider 0
+    batting_stats_ = [x for x in batting_stats if x and x['runs'] != None] #this is wrong, this doesnt consider 0
     
     averages = {}
     totals = {}
@@ -493,7 +498,20 @@ def aggregate_batting_analysis(batting_stats):
         except ZeroDivisionError:
             av = float('inf')
 
-    
+    if cricket_runs_ave and 'runs' in keys:
+        runs = 0
+        not_outs = 0
+        for stat in batting_stats_:
+            try:
+                runs += stat['runs']
+                if stat['not_out']:
+                    not_outs += 1
+            except TypeError:
+                logger.debug('Problem with statline when calculating averages\n%s', stat)
+                
+        runs = runs/(len(batting_stats_) - not_outs)
+        averages['runs'] = runs 
+
     return averages, totals
 
 def analyse_batting(contributions):
@@ -510,6 +528,9 @@ def analyse_batting(contributions):
 
 
 def check_runout_while_nonstriker(commentary_df:pd.DataFrame, player_id, match_object, is_object_id = False):
+    if not isinstance(player_id, int):
+        player_id = int(player_id)
+    
     if is_object_id:
         player_id = get_player_map(match_object, 'player_id', 'object_id')[int(player_id)]
     
@@ -543,11 +564,14 @@ def check_runout_while_nonstriker(commentary_df:pd.DataFrame, player_id, match_o
         #         if int(get_player_team(player_id, match_object)['team']) == int(wicket.battingTeam):
         #             return i, wicket
     return None, pd.DataFrame()
-    
-
 
 def get_player_contributions(player_id:str or int, matches:list[match.MatchData], _type = 'both', by_innings = False, is_object_id=False):
-    if not isinstance(matches, list):
+    if matches == None:
+        if is_object_id:
+            matches = [int(m) for m  in wsf.get_player_match_list(player_id)]
+        else:
+            raise Exception('Match list not provided. Note: If player id is not object id, match list must be provided')
+    if not isinstance(matches, Iterable):
         matches = [matches]
     
     contributions = []
@@ -569,6 +593,9 @@ def _get_player_contribution(player_id:str or int, _match:match.MatchData, _type
     """
     Get player innings from a match commentary
     """
+    if not isinstance(player_id, int):
+        player_id = int(player_id)
+    
     if not isinstance(_match, match.MatchData):
         _match = match.MatchData(_match)
 
@@ -630,6 +657,9 @@ def _get_player_contribution(player_id:str or int, _match:match.MatchData, _type
     return comms
 
 def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False, save=False, try_local=True):
+    if not isinstance(player_id, int):
+        player_id = int(player_id)
+    
     if matches == None:
         if is_object_id:
             matches = [int(m) for m  in wsf.get_player_match_list(player_id)]
@@ -669,7 +699,9 @@ def _cricket_totals(player_id, m:match.MatchData or int, _type='both', by_inning
     """
     Get the cricketing totals for the players. I.e. their stats in the collected innings.
     """
-    
+    if not isinstance(player_id, int):
+        player_id = int(player_id)
+
     try:
         logger.info("Getting player totals for match: %s Player: %s", m.match_id, player_id)
     except AttributeError:
@@ -1258,3 +1290,47 @@ def average_elements_of_list(list_of_lists:list[list]):
         averaged_list.append(element_tot/element_count)
 
     return averaged_list
+
+def get_player_performances_in_periods(player_id, min_period, max_period = None, cricket_totals = None, _format='test', _type='bat', cricket_runs_ave=True):
+    """
+    Returns the player stats in time periods defined by the minimum to maximum period lengths
+    Note: player_id is object_id
+    If there is no max period, then the only the single minimum period value will be calculated
+
+    Returns: dict of periodic stats
+    {period:{start_inning:end_inning:{average:ave_dict, totals: tots_dict, innings: period_innings}}}
+    """
+    if not max_period:
+        max_period = min_period + 1
+    
+    periodic_stats = {}
+    if not cricket_totals:
+        matches = wsf.get_player_match_list(player_id, _format=_format)
+        cricket_totals = get_cricket_totals(player_id, matches, _type=_type, by_innings=True, is_object_id=True)
+
+    for period in range(min_period, max_period):    
+        periodic_stats[period] = {}
+
+        for i in range(len(cricket_totals)-period + 1):
+
+            period_match_totals = cricket_totals[i:(i+period)]
+            period_ave, period_tot = aggregate_batting_analysis(period_match_totals, cricket_runs_ave=cricket_runs_ave)
+            periodic_stats[period][f'{i}:{i+period}'] = {'averages':period_ave, 'totals':period_tot, 'innings': period_match_totals}
+    
+    return periodic_stats
+
+def get_best_periods(player_id, min_period=1, max_period=None, display_key=None, stat_type='averages', stat='runs', lowest=False, _format='test', _type='bat', periodic_stats=None):
+    """
+    Gets the best metric in each period in periodic stats. If periodic stats are provided then no period needs to be provided
+    """
+    if not periodic_stats:
+        periodic_stats = get_player_performances_in_periods(player_id, min_period, max_period, _format=_format, _type=_type)
+
+    agg_func = max
+    if lowest:
+        agg_func = min
+    
+    agg_stat_in_periods = [agg_func(periodic_stats[period], key=lambda x: periodic_stats[period][x][stat_type][stat]) for period in periodic_stats] #Extracting the max/min stat in the period 
+    agg_stat_in_periods = [(periodic_stats[list(periodic_stats.keys())[i]][period][stat_type][stat], period) for i,period in enumerate(agg_stat_in_periods)] #Get period max stat occured in
+    
+    return {x[0]:x[1] for x in zip([key for key in periodic_stats], agg_stat_in_periods)} 
