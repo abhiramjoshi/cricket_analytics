@@ -18,6 +18,25 @@ from math import isnan
 from sqlalchemy.orm import sessionmaker
 from models import engine, PlayerMatchStats, Match
 
+NULL_BATTING_ANALYSIS = {
+    'runs': 0,
+    'dismissals': 0,
+    'balls': 0,
+    'sr': 0,
+    'average': 0,
+    'dot_balls': 0,
+    'ones': 0, 
+    'twos': 0,
+    'threes': 0, 
+    'fours': 0,
+    'fives': 0,
+    'sixes': 0,
+    'how-out': None,
+    'total_balls_faced': 0,
+    'fours_per_ball': 0,
+    'sixes_per_ball': 0,
+    'dots_per_ball': 0
+}
 
 def pre_transform_comms(match_object:match.MatchData):
     logger.info(f'Pre-transforming match commentary for {match_object.match_id}')
@@ -420,11 +439,14 @@ def save_player_stats_to_db(stats, player_id, _match:match.MatchData, is_object_
         session.commit()
 
 
-def analyse_batting_inning(contributuion):
+def analyse_batting_inning(contributuion:pd.DataFrame):
     try:
         player_id = contributuion.batsmanPlayerId.value_counts().index[0]
     except IndexError:
         player_id = None
+
+    if contributuion.empty:
+        return NULL_BATTING_ANALYSIS
 
     def safe_divide(numerator, denominator, _round=2):
         try:
@@ -463,7 +485,7 @@ def analyse_batting_inning(contributuion):
     return {
         'runs': runs,
         'dismissals': dismissals,
-        'balls':balls,
+        'balls_faced':balls,
         'sr':strike_rate,
         'average': average,
         'dot_balls': dot_balls,
@@ -1258,6 +1280,8 @@ def search_for_keywords(text_items, keywords = [], exclude_words = [], primary_k
     return tuple(return_object)
 
 def cumulative_sr(inning_comms:pd.DataFrame):
+    """Calculates the cumulative strike rate through the innings"""
+    
     tot_runs = 0
     tot_balls = 0
 
@@ -1274,6 +1298,11 @@ def cumulative_sr(inning_comms:pd.DataFrame):
     return cum_sr
 
 def average_elements_of_list(list_of_lists:list[list]):
+    """
+    Average each element of a list over all the lists. Can handle lists of varying lengths.
+    Only the lists with element in ith position are considered in average
+    """
+    
     max_length = len(max(list_of_lists, key=lambda x: len(x)))
 
     averaged_list = []
@@ -1334,3 +1363,62 @@ def get_best_periods(player_id, min_period=1, max_period=None, display_key=None,
     agg_stat_in_periods = [(periodic_stats[list(periodic_stats.keys())[i]][period][stat_type][stat], period) for i,period in enumerate(agg_stat_in_periods)] #Get period max stat occured in
     
     return {x[0]:x[1] for x in zip([key for key in periodic_stats], agg_stat_in_periods)} 
+
+def search_shots_in_comms(contributions, search_keywords, exlude_words=[], primary_keywords=[], threshold = 0.5):
+    """Search for a particular shot in a set of commentary and return commentary df where the shot was played"""
+    shots = []
+    for i, comms in enumerate(contributions):
+        innings = comms.commentTextItems.to_list()
+        search = search_for_phrases(innings, keywords=search_keywords, exclude_words=exlude_words, primary_keywords=primary_keywords, threshold = threshold)
+        shots.append(comms.iloc[[i for i,x in enumerate(search[0]) if x == 1]])
+        
+    return shots
+
+def graph_shot_runs(shot_stats, full_innings, shot_name, colours=['#5f187f','#f8765c']):
+    runs = []
+    for i in range(len(full_innings)):
+        r = {'runs':shot_stats[i]['runs'], 'type':shot_name,'inning':i}
+        r2 = {'runs':full_innings[i]['runs'], 'type':'total','inning':i}
+        runs.append(r2)
+        runs.append(r)
+
+    runs_df = pd.DataFrame(runs)
+
+    fig, ax1 = plt.subplots(figsize=(30,20)) 
+    colours = colours
+    custom = sns.set_palette(sns.color_palette(colours))
+    sns.barplot(data = runs_df, x=runs_df.inning, y=runs_df.runs, alpha=0.8, ax=ax1, palette=custom, hue=runs_df.type, dodge=False)
+    ax1.set_xticklabels(labels=[x for x in range(len(full_innings))], rotation=90);
+    ax1.xaxis.set_major_locator(plt.MaxNLocator(10))
+    ax1.margins(x=0)
+
+    return fig, runs_df
+
+def fraction_of_total(shot_stats, full_innings, key):
+    perc_of_total = []
+    for i in range(len(full_innings)):
+        try:
+            perc_of_total.append(round(int(shot_stats[i][key])/int(full_innings[i][key]), 2))
+        except ZeroDivisionError:
+            perc_of_total.append(0)
+
+    return perc_of_total
+
+def moving_average(nums, window_size=5):
+    last_x_average = [None]*(window_size)
+
+    for i in range(len(nums)-window_size):
+        last_x_average.append(round(sum(nums[i:i+window_size])/window_size, 5))
+
+    return last_x_average
+
+def cumulative_average(nums):
+    total = 0
+    cum_average = []
+
+    for i, x in enumerate(nums):
+        total += x
+        bf = total/(i+1)
+        cum_average.append(bf)
+    
+    return cum_average
