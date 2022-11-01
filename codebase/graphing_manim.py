@@ -306,14 +306,15 @@ class LineGraph(Axes):
         self.line_configs = self._handle_line_configs()  
 
         #Setup y-axis
-        max_y = abs(max(max(self.y_values, key=lambda x:abs(max(x))), key=lambda x: abs(x)))
+        temp_y = [[y for y in ylist if y is not None] for ylist in y_values]
+        max_y = abs(max(max(temp_y, key=lambda x:abs(max(x))), key=lambda x: abs(x)))
 
         if y_length is None:
             y_length = min(max_y, config.frame_width - 2)
         else:
             y_length = y_length
 
-        if max(max(self.y_values, key=lambda x:abs(max(x))), key=lambda x: abs(x)) < 0:
+        if max(max(temp_y, key=lambda x:abs(max(x))), key=lambda x: abs(x)) < 0:
             min_y = -max_y
         else:
             min_y = 0
@@ -380,8 +381,10 @@ class LineGraph(Axes):
 
         add_vertex_dots = self.line_config.pop('add_vertex_dots', False)
 
+        x_values = [x for i,x in enumerate(self.x_values) if y[i] is not None]
+        y = [_y for _y in y if _y is not None]
         line = self.plot_line_graph(
-            x_values=self.x_values,
+            x_values=x_values,
             y_values=y,
             line_color=colour,
             **self.line_config
@@ -578,7 +581,7 @@ class LineGraphScene(Scene):
 
         plot = LineGraph(
             x_values=[1,2,3,4,5,6],
-            y_values=[[5,6.8,6,9,7,6], ([5,4,5,8,3,4], {'dashed':True})],
+            y_values=[[5,6.8,6,9,7,6], ([5,None,None,8,3,4], {'dashed':True})],
             #y_values=([1,2,3,4,5], {'r':True}),
             x_length=10,
             y_length=5,
