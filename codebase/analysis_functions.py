@@ -21,7 +21,7 @@ from models import engine, PlayerMatchStats, Match
 NULL_BATTING_ANALYSIS = {
     'runs': 0,
     'dismissals': 0,
-    'balls': 0,
+    'balls_faced': 0,
     'sr': 0,
     'average': 0,
     'dot_balls': 0,
@@ -1422,3 +1422,68 @@ def cumulative_average(nums):
         cum_average.append(bf)
     
     return cum_average
+
+def extract_scoring_rates(tests, post_tests = [], period=None):
+    """
+    Extract the scoring rates from list of test matches.
+    
+    Inputs
+    ------
+
+    tests: List of test match id's to extract dates from
+    period: the period of aggregation. Can be year, month or None(which does it by day)
+    """
+    
+    scoring_rates = {}
+    for _match in tests:
+        m = match.MatchData(_match, no_comms=True)
+        date = datetime.strptime(m.date, '%Y-%m-%d')
+        if period == None:
+            date = m.date
+        if period == 'month':
+            date = datetime.strftime(date, '%Y-%m')
+        if period == 'year':
+            date = datetime.strftime(date, '%Y')
+        rates = [x['run_rate'] for x in m.innings]
+        try:
+            scoring_rates[date][0]+=rates
+            scoring_rates[date][1]+=len(rates)
+        except KeyError:
+            scoring_rates[date] = [[],0]
+            scoring_rates[date][0]=rates
+            scoring_rates[date][1]=len(rates)
+
+    # post_scoring_rates = {}
+    # for _match in post_tests:
+    #     m = match.MatchData(_match, no_comms=True)
+    #     date = datetime.strptime(m.date, '%Y-%m-%d')
+    #     if period == None:
+    #         date = m.date
+    #     if period == 'month':
+    #         date = datetime.strftime(date, '%Y-%m')
+    #     if period == 'year':
+    #         date = datetime.strftime(date, '%Y')
+    #     scoring_rates = [x['run_rate'] for x in m.innings]
+    #     try:
+    #         post_scoring_rates[date][0]+=scoring_rates
+    #         post_scoring_rates[date][1]+=len(scoring_rates)
+    #     except KeyError:
+    #         post_scoring_rates[date] = [[],0]
+    #         post_scoring_rates[date][0] = scoring_rates
+    #         post_scoring_rates[date][1] = len(scoring_rates)
+    
+    return scoring_rates
+
+def resolve_scoring_rates_to_ave(scoring_rate):
+    scoring_rate_aves_y = {}
+    for date in scoring_rate:
+        try:
+            temp_soring_rates = []
+            for rate in scoring_rate[date][0]:
+                if rate:
+                    temp_soring_rates.append(float(rate))
+            scoring_rate_aves_y[date] = sum(temp_soring_rates)/len(temp_soring_rates)
+        except:
+            logger.debug("Error with scoring rate entry: %s:%s", date,  scoring_rate[date][0])
+    
+    return scoring_rate_aves_y

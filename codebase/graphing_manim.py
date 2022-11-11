@@ -154,6 +154,8 @@ class ScatterPlot(Axes):
         coord_colours: Iterable[str] = [
             "#FFFFFF"
         ],
+        dot_radius = DEFAULT_DOT_RADIUS,
+        only_create_coords=False,
         **kwargs
     ):
         self.values = values
@@ -214,6 +216,7 @@ class ScatterPlot(Axes):
             (x_axis_config,), (kwargs.pop("x_axis_config", None),)
         )
 
+        self.dot_radius = dot_radius
         self.coords = VGroup()
 
         super().__init__(
@@ -226,7 +229,7 @@ class ScatterPlot(Axes):
             **kwargs,
         )
 
-        self._add_coords(only_create=kwargs.pop("only_create_coords", False))
+        self._add_coords(only_create=only_create_coords)
         self.x_axis.add_numbers()
         self.y_axis.add_numbers()
 
@@ -234,12 +237,13 @@ class ScatterPlot(Axes):
         self.coords.set_color_by_gradient(*self.coord_colours)
 
     def _create_coord(self, value, i):
+        
         if len(self.coord_colours) == len(self.values):
             colour = self.coord_colours[i]
         else:
-            colour = None
+            colour = self.coord_colours[i % len(self.coord_colours)]
         
-        return Dot(self.coords_to_point(value[0], value[1]), color=colour)
+        return Dot(self.coords_to_point(value[0], value[1]), radius=self.dot_radius, color=colour)
     
     def _add_coords(self, only_create=False):
         return_group = VGroup()
@@ -257,7 +261,26 @@ class ScatterPlot(Axes):
         if not only_create:
             self.add(self.coords)
 
-        return 
+        return return_group
+
+    def sort_coords(self):
+        """Sorts coords and places them back into self.coords"""
+        sorted_coords = VGroup()
+        coord_squares = []
+        origin = self.c2p(self.x_axis.x_min, self.y_axis.x_min)
+
+        for i,c in enumerate(self.coords):
+            normalized_point = c.arc_center-origin
+            # We calculate the distance from the origin of all the coords, we will later sort by this distance
+            coord_squares.append((np.linalg.norm(normalized_point), i))
+        
+        coord_squares = sorted(coord_squares, key=lambda x: x[0])
+
+        #Re add all the coords in sorted order, NOTE: c[1] references the original index of the coord
+        for c in coord_squares:
+            sorted_coords.add(self.coords[c[1]])
+
+        self.coords = sorted_coords
 
     def get_coords(self):
         return self.coords
@@ -288,6 +311,7 @@ class LineGraph(Axes):
             "#ffa600",
         ],
         only_create_lines=False,
+        x_axis_is_years=False,
         **kwargs
     ):
         self.x_values = x_values
@@ -306,7 +330,7 @@ class LineGraph(Axes):
         self.line_configs = self._handle_line_configs()  
 
         #Setup y-axis
-        temp_y = [[y for y in ylist if y is not None] for ylist in y_values]
+        temp_y = [[float(y) for y in ylist if y is not None] for ylist in self.y_values]
         max_y = abs(max(max(temp_y, key=lambda x:abs(max(x))), key=lambda x: abs(x)))
 
         if y_length is None:
@@ -323,11 +347,11 @@ class LineGraph(Axes):
             y_range = [
                 min_y,
                 max_y,
-                round(max_y / y_length, 2),
+                round((max_y - min_y) / y_length, 2),
             ]
 
         elif len(y_range) == 2:
-            y_range = [*y_range, round(max_y / y_length, 2)]
+            y_range = [*y_range, round((y_range[1]-y_range[0]) / y_length, 2)]
         
         y_axis_config = {"font_size": 24, "label_constructor": Tex}
         self._update_default_configs(
@@ -336,7 +360,7 @@ class LineGraph(Axes):
 
         #Setup x-axis
         max_x = abs(max(self.x_values))
-
+        min_x = min(min(x_values), 0)
         if x_length is None:
             x_length = min(max_x, config.frame_width - 2)
         else:
@@ -344,15 +368,18 @@ class LineGraph(Axes):
 
         if x_range is None:
             x_range = [
-                min(min(x_values), 0),
+                min_x,
                 max_x,
-                round(max_x / x_length, 2),
+                round((max_x - min_x) / x_length, 2),
             ]
 
         elif len(x_range) == 2:
-            x_range = [*x_range, round(max_x / x_length, 2)]
+            x_range = [*x_range, round((x_range[1]-x_range[0]) / x_length, 2)]
 
-        x_axis_config = {"font_size": 24, "label_constructor": Tex}
+        decimal_number_config = {}
+        if x_axis_is_years:
+            decimal_number_config = {'group_with_commas':False, 'num_decimal_places':0}
+        x_axis_config = {"font_size": 24, "label_constructor": Tex, 'decimal_number_config':decimal_number_config}
         self._update_default_configs(
             (x_axis_config,), (kwargs.pop("x_axis_config", None),)
         )
@@ -568,12 +595,15 @@ class ScatterPlotScene(Scene):
             y_range=[0,600,100],
             x_range=[1990,1994,1],
             coord_colours=[BLUE, WHITE, RED],
-            x_axis_config = {'decimal_number_config':{'group_with_commas':False, 'num_decimal_places':0}}
+            x_axis_config = {'decimal_number_config':{'group_with_commas':False, 'num_decimal_places':0}},
+            only_create_coords=True
         )
         
-        extra_coord = Dot(plot.coords_to_point(1994,600), color=YELLOW)
-        plot_group = VGroup(plot, extra_coord)
-        self.play(Write(plot_group))
+        plot.sort_coords()
+        coords = plot.get_coords()
+        # extra_coord = Dot(plot.coords_to_point(1994,600), color=YELLOW)
+        self.play(Write(plot))
+        self.play(Create(coords))
 
 class LineGraphScene(Scene):
 
@@ -585,13 +615,25 @@ class LineGraphScene(Scene):
             #y_values=([1,2,3,4,5], {'r':True}),
             x_length=10,
             y_length=5,
+            only_create_lines=True
         )
 
-        line = plot.plot_line_graph([1,2,3,4,5,6],[5,4,5,8,3,4])
+        lines = plot.lines
         # plot.add(line)
 
-        self.play(Write(plot))
+        self.play(Create(plot))
+        for line in lines:
+            self.play(Create(line))
+            self.wait(1)
         self.wait(3)
+
+class LineAnimations(Scene):
+
+    def construct(self):
+        line = Line()
+
+        self.play(Create(line))
+        self.wait()
 
 if __name__ == "__main__":
     # scene = CareerGraph('253802', player_age='30:')
@@ -600,11 +642,14 @@ if __name__ == "__main__":
     # scene = BarGraph()
     # scene.render()
 
-    # scene = ScatterPlotScene()
-    # scene.render()
-
-    scene = LineGraphScene()
+    scene = ScatterPlotScene()
     scene.render()
+
+    #scene = LineGraphScene()
+    #scene.render()
+
+    # scene = LineAnimations()
+    # scene.render()
 
     # scene = LineGraphExample()
     # scene.render()
