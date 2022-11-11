@@ -25,19 +25,22 @@ def test_get_match_list():
 def test_get_scorecard(url, match_id, try_local, save):
     return wsf.get_match_scorecard(url=url, match_id=match_id, try_local=try_local, save=save)
 
+#def read_statsguru_generic():
+
+
 if __name__ == '__main__':
-    URL = 'https://stats.espncricinfo.com/ci/engine/player/253802.html?class=1;orderby=start;template=results;type=allround;view=match;wrappertype=text'
+    URL = 'https://stats.espncricinfo.com/ci/engine/stats/index.html?class=1;filter=advanced;orderby=runs;page=2;qualmin1=80;qualval1=innings;template=results;type=batting'
     TEST_MATCHES_URL = 'https://stats.espncricinfo.com/ci/engine/records/team/match_results.html?class=1;id=2022;type=year;wrappertype=text'
-    PLAYER_ID = '253802'
-    SCORECARD_MATCH = md.MatchData("226351")
+    #PLAYER_ID = '253802'
+    #SCORECARD_MATCH = md.MatchData("226351")
     start = timeit.default_timer()
-    # tables = test_tables(TEST_MATCHES_URL, table_name=None)
+    tables = test_tables(URL, table_name='Overall figures')
     # match_list = test_player_match_list(PLAYER_ID)
-    match_scorecard = test_get_scorecard(SCORECARD_MATCH.match_url, SCORECARD_MATCH.match_id, False, False)
+    # match_scorecard = test_get_scorecard(SCORECARD_MATCH.match_url, SCORECARD_MATCH.match_id, False, False)
     # match_list = wsf.get_match_list(years=['2023'])
     stop = timeit.default_timer()
     print('Time taken: ', stop-start)
-    print(match_scorecard)
+    print(tables[0].Player)
     # print(len(match_scorecard))
     # pprint.pprint(tables)
     # print(type(tables[0]))
