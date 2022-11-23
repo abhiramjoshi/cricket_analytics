@@ -27,6 +27,68 @@ kohli_stats = wsf.get_player_career_stats(KOHLI_ID)
 # williamson_totals = af.get_cricket_totals(WILLIAMSON_PLAYER_ID, is_object_id=True)
 # smith_totals = af.get_cricket_totals(SPD_SMITH_ID, is_object_id=True)
 
+class KohliCareer(Scene):
+    def construct(self):
+        kohli_matches = wsf.get_player_match_list(KOHLI_ID)
+        kohli_out_of_form = kohli_matches[84:]
+
+        kohli_career = gm.CareerGraph(KOHLI_ID)
+        kohli_out_of_form_career = gm.CareerGraph(KOHLI_ID, match_ids=kohli_out_of_form, x_range=(141, len(kohli_career.running_ave)), numbers_to_include=[150,160,170])
+
+        y_range = kohli_career.bar_axes.axes[1].x_range
+        kohli_intermediate_career = gm.CareerGraph(KOHLI_ID, match_ids=kohli_out_of_form, x_range=(141, len(kohli_career.running_ave)), numbers_to_include=[150,160,170], y_range=y_range)
+        bad_form_running_ave = kohli_career.running_ave[141:]
+        bad_form_recent_form_ave = kohli_career.recent_form_ave[141:]
+
+        x = np.arange(141,len(kohli_career.running_ave))
+        bfrfl_i = kohli_intermediate_career.bar_axes.plot_line_graph(x, bad_form_recent_form_ave, line_color=RED, add_vertex_dots=False)
+        bfra_i = kohli_intermediate_career.bar_axes.plot_line_graph(x, bad_form_running_ave, line_color=BLUE, add_vertex_dots=False)
+        bfrfl = kohli_out_of_form_career.bar_axes.plot_line_graph(x, bad_form_recent_form_ave, line_color=RED, add_vertex_dots=False)
+        bfra = kohli_out_of_form_career.bar_axes.plot_line_graph(x, bad_form_running_ave, line_color=BLUE, add_vertex_dots=False)
+
+        kohli_career_numbers = kohli_career.bar_axes.x_axis.submobjects.pop(0)
+        kohli_career_bad_numbers = kohli_out_of_form_career.bar_axes.x_axis.submobjects.pop(0)
+        kohli_int_numbers = kohli_intermediate_career.bar_axes.x_axis.submobjects.pop(0)
+
+        # self.play(Create(kohli_career.bar_axes))
+        self.play(
+            Create(kohli_career.bar_axes),
+            Create(kohli_career_numbers),
+            #Create(kohli_career.grid), 
+            Write(kohli_career.not_outs), 
+            Write(kohli_career.title)
+        )
+        for line in kohli_career.average_lines:
+            self.play(Create(line))
+
+        self.play(
+            Unwrite(kohli_career.not_outs)
+        )
+
+        # for line in kohli_career.average_lines:
+        #     self.play(Uncreate(line))
+        kohli_pre = VGroup(kohli_career.bar_axes, kohli_career.average_lines[0],kohli_career.average_lines[1])
+        kohli_post = VGroup(kohli_out_of_form_career.bar_axes, bfra, bfrfl)
+        kohli_int = VGroup(kohli_intermediate_career.bar_axes, bfra_i, bfrfl_i)
+
+
+        # self.play()
+        self.play(
+            Uncreate(kohli_career_numbers[:-4]),
+            Transform(kohli_pre, kohli_int, replace_mobject_with_target_in_scene=True),
+            Transform(kohli_career_numbers[-4:], kohli_career_bad_numbers)
+        )
+        self.play(
+            Transform(kohli_int, kohli_post)
+        )
+        #self.play(FadeTransform(kohli_career.grid, kohli_out_of_form_career.grid))
+        
+        # for line in [bfra, bfrfl]:
+        #     self.play(Create(line))        
+
+        self.wait()
+
+
 class Fab4Careers(Scene):
     
     def __init__(self, renderer=None, camera_class=Camera, always_update_mobjects=False, random_seed=None, skip_animations=False):
@@ -433,6 +495,34 @@ class KohliDotBalls(Scene):
 class TopBatsmanForm(Scene):
     pass
 
+class NumberlineTest(Scene):
+    def construct(self):
+        line1 = NumberLine(
+            x_range=[1,10,1],
+            length=10,
+            include_numbers=True
+        )
+        line2 = NumberLine(
+            x_range=[7,10,1],
+            length=10,
+            include_numbers=True
+        )
+        line1.submobjects.pop(1)
+        line2.submobjects.pop(1)
+        self.play(Create(line1), Create(line1.numbers))
+        self.play(Transform(line1, line2))
+        self.play(Uncreate(line1.numbers[:6]), Transform(line1.numbers[6:] , line2.numbers, replace_mobject_with_target_in_scene=True))
+        self.wait()
+
+class ShiftedAxis(Scene):
+    def construct(self):
+        kohli_matches = wsf.get_player_match_list(KOHLI_ID)
+        kohli_out_of_form = kohli_matches[84:]
+        kohli_out_of_form_career = gm.CareerGraph(KOHLI_ID, match_ids=kohli_out_of_form, x_range=(141,173), numbers_to_include=[150,160,170])
+
+        self.add(kohli_out_of_form_career.bar_axes)
+        self.add(kohli_out_of_form_career.average_lines[0])
+
 if __name__ == "__main__":
     
     # print(kohli_stats)
@@ -441,7 +531,10 @@ if __name__ == "__main__":
     # scene = CoverDriveShotFreq()
     # scene = FlickShotFreq()
     # scene = DotBallFreq()
-    scene = ShotFrequenciesKohli()
+    scene = KohliCareer()
+    # scene = ShiftedAxis()
+    # scene = NumberlineTest()
+    # scene = ShotFrequenciesKohli()
     # scene = Fab4Careers()
     scene.render()
 
