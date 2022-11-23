@@ -9,7 +9,7 @@ config.quality = 'low_quality'
 
 class CareerGraph(Scene):
     def __init__(self, player_id, renderer=None, camera_class=Camera, always_update_mobjects=False, random_seed=None, skip_animations=False,
-                _format = 'test', _type='bat', player_age=None, dates=None, window_size=10):
+                _format = 'test', _type='bat', player_age=None, dates=None, window_size=10, match_ids=None, x_range=None, y_range=None, numbers_to_include=None):
         super().__init__(renderer, camera_class, always_update_mobjects, random_seed, skip_animations)
         
         if player_age:
@@ -21,76 +21,126 @@ class CareerGraph(Scene):
         self.player_name = wsf.get_player_json(self.player_id)["name"]
         self.type = _type
         self.format = _format
-        self.matchlist = wsf.get_player_match_list(player_id, dates=self.dates, _format=self.format)
+        if match_ids:
+            self.matchlist = match_ids
+        else:
+            self.matchlist = wsf.get_player_match_list(player_id, dates=self.dates, _format=self.format)
         self.innings = af.get_cricket_totals(self.player_id, self.matchlist, _type=self.type, by_innings=True, is_object_id=True)
         self.running_ave = af.get_running_average(self.player_id, self.innings)
         self.recent_form_ave = af.get_recent_form_average(self.player_id, self.innings, window_size=window_size)
-    
-    def construct(self):
+        
+        self.innings_df = pd.DataFrame(self.innings)
         x = np.arange(len(self.running_ave))
-        innings_df = pd.DataFrame(self.innings)
-        r_a = self.running_ave
-        r_f_a = self.recent_form_ave
-        _x_range=[0, x[-1]+1, (lambda x:x//4 if (x < 50) else 10)(x[-1])]
-        _y_range=[0, max(innings_df.runs)+20, max((max(innings_df.runs)//8), 10)]
+        if x_range is not None and len(x_range) == 3:
+            self._x_range = x_range
+        elif x_range is not None:
+            self._x_range=[x_range[0], x_range[1], (lambda x:x//4 if (x < 50) else 10)(x_range[1])]
+        else:
+            self._x_range=[0, x[-1]+1, (lambda x:x//4 if (x < 50) else 10)(x[-1])]
         
-        # axes = Axes(
-        #     x_range=(_x_range[0], _x_range[1], _x_range[2]),
-        #     y_range=(_y_range[0], _y_range[1], _y_range[2]),
-        #     tips=False,
-        #     axis_config={"include_numbers": True},
-        #     #x_axis_config={
-        #     #    "numbers_to_include": np.arange(_x_range[0],_x_range[1], _x_range[2])
-        #     #},
-        #     #y_axis_config={
-        #     #    "numbers_to_include": np.arange(_y_range[0],_y_range[1], _y_range[2])
-        #     #}
-        # )
+        if y_range is not None and len(y_range) == 3:
+            self._y_range = y_range
+        elif y_range is not None:
+            self._y_range=[y_range[0], y_range[1], max((y_range[1]//8), 10)]
+        else:
+            self._y_range=[0, max(self.innings_df.runs)+20, max((max(self.innings_df.runs)//8), 10)]
         
+        if numbers_to_include:
+            self.numbers_to_include = numbers_to_include
+        else:
+            self.numbers_to_include = np.arange(self._x_range[0],self._x_range[1], self._x_range[2])
+
+        self.bar_axes = self.get_bars_chart(x_range)
+        self.not_outs = self.get_not_outs()
+        self.average_lines = self.get_average_lines()
+        self.title = self.get_title()
+        self.grid = self.make_grid()
+
+    def get_bars_chart(self, x_range=None):
+        x = np.arange(len(self.running_ave))
         axes = BarChart(
-            values=innings_df.runs,
-            y_range=(_y_range[0], _y_range[1], _y_range[2]),
-            axis_config={"include_numbers": True},
+            values=self.innings_df.runs,
+            y_range=(self._y_range[0], self._y_range[1], self._y_range[2]),
+            x_range=x_range,
+            # x_range=(self._x_range[0], self._x_range[1], self._x_range[2])
+            axis_config={"include_numbers": True, 'decimal_number_config':{'num_decimal_places': 0}},
             x_axis_config={
-               "numbers_to_include": np.arange(_x_range[0],_x_range[1], _x_range[2])
+               "numbers_to_include": self.numbers_to_include,
+               'include_ticks':False,
+               'decimal_number_config':{'num_decimal_places': 0}
             },
             bar_colors=['#003f5c']*len(x)
         )
 
-        constr_args = {'radius':axes.bars[0].width/4, 'fill_opacity':1}
-        _not_outs = axes.get_bar_labels(color=RED, constr_args=constr_args, label_constructor=Circle, buff=SMALL_BUFF)
+        return axes
+
+    def get_not_outs(self):
+        constr_args = {'radius':self.bar_axes.bars[0].width/4, 'fill_opacity':1, 'no_val':True}
+        _not_outs = self.bar_axes.get_bar_labels(color=RED, constr_args=constr_args, label_constructor=Circle, buff=SMALL_BUFF)
         not_outs = VGroup()
-        n = [x for i,x in enumerate(_not_outs) if innings_df.not_out.iloc[i]]
+        n = [x for i,x in enumerate(_not_outs) if self.innings_df.not_out.iloc[i]]
         for i in n:
             not_outs.add(i)
-        #Create grid
+        return not_outs
+
+    def make_grid(self):
         grid= VGroup()
-        for val in np.arange(_x_range[0]+_x_range[2],_x_range[1]+(1*_x_range[2]), _x_range[2]):
-            grid += axes.get_vertical_line(axes.c2p(val, _y_range[1], 0), color=GRAY)
-        for val in np.arange(_y_range[0]+_y_range[2],_y_range[1], _y_range[2]):
-            grid += axes.get_horizontal_line(axes.c2p(_x_range[1], val, 0), color=GRAY)
-
-        #Additional scence components
-        running_ave = axes.plot_line_graph(x, r_a, add_vertex_dots=False, line_color=BLUE)
-        recent_form_ave = axes.plot_line_graph(x, r_f_a, add_vertex_dots=False, line_color=RED)
-        top_line = axes.plot(lambda x: _y_range[1], color=WHITE)
+        for val in np.arange(self._x_range[0]+self._x_range[2],self._x_range[1]+(1*self._x_range[2]), self._x_range[2]):
+            grid += self.bar_axes.get_vertical_line(self.bar_axes.c2p(val, self._y_range[1], 0), color=GRAY)
+        for val in np.arange(self._y_range[0]+self._y_range[2],self._y_range[1], self._y_range[2]):
+            grid += self.bar_axes.get_horizontal_line(self.bar_axes.c2p(self._x_range[1], val, 0), color=GRAY)
+        return grid
         
-        area_blank = axes.get_area(top_line, x_range=[23,23], color=YELLOW, opacity=0.2)
-        area = axes.get_area(top_line, x_range=[23,47], color=YELLOW, opacity=0.2)
+    def get_average_lines(self):
+        x = np.arange(self._x_range[0], self._x_range[1])
+        r_a = self.running_ave
+        r_f_a = self.recent_form_ave
+        running_ave = self.bar_axes.plot_line_graph(x, r_a, add_vertex_dots=False, line_color=BLUE)
+        recent_form_ave = self.bar_axes.plot_line_graph(x, r_f_a, add_vertex_dots=False, line_color=RED)
+        return [running_ave, recent_form_ave]
         
+    def get_title(self):
         title = Text(f"{self.player_name} Career")
-        title.next_to(axes, UP)
-        
-        #Create Animation
-        self.play(Create(axes), Create(grid), Write(title))
-        self.play(Create(running_ave), Create(recent_form_ave), Write(not_outs), run_time=1.5)
-        self.wait(2)
-        #self.play(Create(area_blank))
-        #self.play(Transform(area_blank, area))
-        self.play(Write(area))
-        self.wait(2)
+        title.next_to(self.bar_axes, UP)
+        return title
 
-        #self.add(axes, running_ave, recent_form_ave, title, grid)
+    # def construct(self):
+        
+        
+        
+    #     # axes = Axes(
+    #     #     x_range=(_x_range[0], _x_range[1], _x_range[2]),
+    #     #     y_range=(_y_range[0], _y_range[1], _y_range[2]),
+    #     #     tips=False,
+    #     #     axis_config={"include_numbers": True},
+    #     #     #x_axis_config={
+    #     #     #    "numbers_to_include": np.arange(_x_range[0],_x_range[1], _x_range[2])
+    #     #     #},
+    #     #     #y_axis_config={
+    #     #     #    "numbers_to_include": np.arange(_y_range[0],_y_range[1], _y_range[2])
+    #     #     #}
+    #     # )
+        
+    
+    #     #Create grid
+        
+
+    #     #Additional scence components
+        
+    #     top_line = axes.plot(lambda x: self._y_range[1], color=WHITE)
+    #     area_blank = axes.get_area(top_line, x_range=[23,23], color=YELLOW, opacity=0.2)
+    #     area = axes.get_area(top_line, x_range=[23,47], color=YELLOW, opacity=0.2)
+        
+    #     #Create Animation
+    #     self.play(Create(axes), Create(grid), Write(title))
+    #     self.play(Create(running_ave), Create(recent_form_ave), Write(not_outs), run_time=1.5)
+    #     self.wait(2)
+    #     #self.play(Create(area_blank))
+    #     #self.play(Transform(area_blank, area))
+    #     self.play(Write(area))
+    #     self.wait(2)
+
+    #     #self.add(axes, running_ave, recent_form_ave, title, grid)
 
 
 class BarGraph(Scene):
@@ -610,8 +660,8 @@ class LineGraphScene(Scene):
     def construct(self):
 
         plot = LineGraph(
-            x_values=[1,2,3,4,5,6],
-            y_values=[[5,6.8,6,9,7,6], ([5,None,None,8,3,4], {'dashed':True})],
+            x_values=[1,2,3,4,5,8],
+            y_values=[[5,6.8,6,9,8,6], ([5,None,None,8,7,4], {'dashed':True})],
             #y_values=([1,2,3,4,5], {'r':True}),
             x_length=10,
             y_length=5,
@@ -642,11 +692,11 @@ if __name__ == "__main__":
     # scene = BarGraph()
     # scene.render()
 
-    scene = ScatterPlotScene()
-    scene.render()
+    # scene = ScatterPlotScene()
+    # scene.render()
 
-    #scene = LineGraphScene()
-    #scene.render()
+    scene = LineGraphScene()
+    scene.render()
 
     # scene = LineAnimations()
     # scene.render()
