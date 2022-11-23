@@ -32,6 +32,7 @@ NULL_BATTING_ANALYSIS = {
     'fives': 0,
     'sixes': 0,
     'how-out': None,
+    'not-out':None,
     'total_balls_faced': 0,
     'fours_per_ball': 0,
     'sixes_per_ball': 0,
@@ -480,7 +481,7 @@ def analyse_batting_inning(contributuion:pd.DataFrame):
     fours_per_ball = safe_divide(fours, balls)
     sixes_per_ball = safe_divide(sixes, balls)
     dots_per_ball = safe_divide(dot_balls, balls)
-    
+    not_out = not contributuion['isWicket'].iloc[-1]
     #In control, out of control
     return {
         'runs': runs,
@@ -496,6 +497,7 @@ def analyse_batting_inning(contributuion:pd.DataFrame):
         'fives': fives,
         'sixes': sixes,
         'how-out': _how_out,
+        'not_out': not_out,
         'total_balls_faced': total_balls_faced,
         'fours_per_ball': fours_per_ball,
         'sixes_per_ball': sixes_per_ball,
