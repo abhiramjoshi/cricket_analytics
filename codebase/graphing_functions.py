@@ -98,13 +98,15 @@ def graph_career_batting_summaries(recent_form=None, running_ave=None, innings_s
         plt.show()
 
 
-def get_career_batting_graph(player_id:str or int, _format:str = 'test', player_age=None, dates:str=None, barhue:str=None, window_size:int = 12, label_spacing=10):
+def get_career_batting_graph(player_id:str or int, _format:str = 'test', player_age=None, dates:str=None, barhue:str=None, window_size:int = 12, label_spacing=10, show_dates=True):
     """
     Gets player contributions between the dates provided and graphs the innings, running average and form average
     NOTE: player_id is object_id.
 
     player-age: See career graph based on a segement of the players age. Format younger age:older age.
     dates: (optional) The dates between which the careers should be graphed, date format YYYY-MM-DD:YYYY-MM-DD
+
+    Returns innings, running everage and recent form average as a tuple
     """
     if player_age:
         dates = af.dates_from_age(player_id, player_age)
@@ -136,10 +138,16 @@ def get_career_batting_graph(player_id:str or int, _format:str = 'test', player_
 
     sns.lineplot(data = {'Average': running_av, f'Last {window_size} Innings': recent_form}, sort = False, ax=ax2, palette='rocket', linewidth=2)
     ax2.set_ylim(y_range)
-    x_dates = innings_df.date.dt.strftime('%d-%m-%Y')
-    ax1.set_xticklabels(labels=x_dates, rotation=90);
+    if show_dates:
+        x_dates = innings_df.date.dt.strftime('%d-%m-%Y')
+        ax1.set_xticklabels(labels=x_dates, rotation=90);
+    else:
+        x_innings = [x for x in range(len(innings))]
+        ax1.set_xticklabels(labels=x_innings)
     ax1.xaxis.set_major_locator(plt.MaxNLocator(label_spacing))
     ax1.margins(x=0)
+
+    return innings, running_av, recent_form
 
 def get_animated_career(player_id:str or int, _format:str = 'test', player_age=None, dates:str=None, barhue:str=None, window_size:int = 12, label_spacing=10):
     if player_age:
