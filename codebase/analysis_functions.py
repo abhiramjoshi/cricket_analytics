@@ -321,7 +321,22 @@ def get_figures_from_scorecard(player_id, _match:match.MatchData, _type, is_obje
             batting_figures.append(inning_batting_figures)
         return batting_figures
 
-def save_player_stats_to_db(stats, player_id, _match:match.MatchData, is_object_id=True):
+def stat_db_record_exists(player_id, match_id, stats, stat_id = None):
+    """
+    Searches db to see if stat exists.
+    Player ID **is not** object_id
+    """
+    Session = sessionmaker(bind=engine)
+    with Session() as session:
+        if not stat_id:
+            stat_id = f"{player_id}{match_id}{stats['inning']}"
+        stat = session.query(PlayerMatchStats).filter_by(stat_id=stat_id).all()
+        if stat:
+            return True
+        else:
+            return False
+
+def save_player_stats_to_db(stats, player_id, _match:match.MatchData, is_object_id=True, force=False):
 
     match_id = _match
     if isinstance(_match, match.MatchData):
@@ -361,7 +376,7 @@ def save_player_stats_to_db(stats, player_id, _match:match.MatchData, is_object_
     logger.info('Opening DB session to %s', engine)
     Session = sessionmaker(bind=engine)
     with Session() as session:
-        logger.info("Checing if match %s exists in DB", match_id)
+        logger.info("Checking if match %s exists in DB", match_id)
         if not session.query(Match).filter_by(match_id = match_id).all():
             ### If match doesn't exist, then we need to create it using a MatchData
             if not isinstance(_match, match.MatchData):
@@ -417,6 +432,10 @@ def save_player_stats_to_db(stats, player_id, _match:match.MatchData, is_object_
         
         stat_id = f"{player_id}{match_id}{stats['inning']}"
         
+        if stat_db_record_exists(player_id=player_id, match_id=match_id, stats=stats, stat_id=stat_id) and not force:
+            logger.info('Skipping DB save as stat exists')
+            return
+
         db_object = PlayerMatchStats(**{
             **{'stat_id':int(stat_id), 'player_id':int(player_id), 'player_object_id':int(player_object_id)},
             **stats
@@ -680,7 +699,7 @@ def _get_player_contribution(player_id:str or int, _match:match.MatchData, _type
     
     return comms
 
-def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False, save=False, try_local=True):
+def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False, save=True, try_local=True):
     if not isinstance(player_id, int):
         player_id = int(player_id)
     
