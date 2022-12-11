@@ -115,9 +115,13 @@ class MatchData(Match):
         """Codifies the match result. Returns match result in format (Win Team, Lose Team, isDraw, Margin)"""
         result = self.result.lower()
         def get_margin(result_string:str):
-            margin = result_string.split('by')[1]
-            margin = margin.strip()
-            margin = margin.lstrip('an')
+            try:
+                margin = result_string.split('by')[1]
+                margin = margin.strip()
+                margin = margin.lstrip('an')
+            except IndexError:
+                margin = result_string
+                logger.error('Error parsing match result %s', result_string)
             return margin
         
         if self.match_class == "Test":
