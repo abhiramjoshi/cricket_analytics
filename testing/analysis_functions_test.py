@@ -62,9 +62,9 @@ if __name__ == '__main__':
     # test_get_career_batting_graph(PLAYER_ID, dates='2020-01-01:')
     # print(test_get_figures_from_scorecard(PLAYER_ID, M, 'bat', True))
     # totals = af.get_cricket_totals(253802, _type='bat', by_innings=True, is_object_id=True, try_local=False, from_scorecards=True)
-    IAN_BELL = 9062
-    totals = af.get_cricket_totals(IAN_BELL, _type='bat', by_innings=True, is_object_id=True)
-    # totals_db = db_interactions_test()
+    # IAN_BELL = 9062
+    # totals = af.get_cricket_totals(IAN_BELL, _type='bat', by_innings=True, is_object_id=True)
+    totals_db = db_interactions_test()
     # for total in totals:
     #     print(total)
     # print()

@@ -699,7 +699,7 @@ def _get_player_contribution(player_id:str or int, _match:match.MatchData, _type
     
     return comms
 
-def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False, save=True, try_local=True):
+def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, is_object_id=False, from_scorecards=False, keep_dismissal_codes=False, save=True, try_local=True, force=False):
     if not isinstance(player_id, int):
         player_id = int(player_id)
     
@@ -715,8 +715,16 @@ def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, 
 
     for _match in matches:
         logger.info('Getting player contributions for match %s', _match)
+        match_save = save
+        if force:
+            logger.debug('Forcing save of stats as "force" flag set to "True"')
+            match_save = True
         try:
-            contribution = _cricket_totals(player_id, _match, _type, by_innings, is_object_id, from_scorecards=from_scorecards, keep_dismissal_codes=keep_dismissal_codes, try_local=try_local)
+            contribution, in_db = _cricket_totals(player_id, _match, _type, by_innings, is_object_id, from_scorecards=from_scorecards, keep_dismissal_codes=keep_dismissal_codes, try_local=try_local)
+            if in_db:
+                if not force:
+                    logger.info('Skipping DB save as stat exists in DB')
+                    match_save = False
             if _type == 'both':
                 for i,inning in enumerate(contribution['bat']+contribution['bowl']):
                     if 'wickets' in inning: #Need know if the contribution is batting or bowling
@@ -725,14 +733,14 @@ def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, 
                         contr_type = 'bat'
                     stats = {**inning, **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}, **{'type':contr_type}}
                     contributions.append(stats)
-                    if save:
+                    if match_save:
                         save_player_stats_to_db(stats, player_id, _match, is_object_id)
                     # contributions.append({**contribution['bowl'], **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}})
             else:
                 for i,inning in enumerate(contribution[_type]):
                     stats = {**inning, **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}, **{'type':_type}}
                     contributions.append(stats)
-                    if save:
+                    if match_save:
                         save_player_stats_to_db(stats, player_id, _match, is_object_id)
         except cricketerrors.MatchNotFoundError:
             logger.warning('Match ID: %s not found', _match)
@@ -752,7 +760,8 @@ def _cricket_totals(player_id, m:match.MatchData or int, _type='both', by_inning
 
     batting_figures = None
     bowling_figures = None
-    
+    in_db = False
+
     if try_local:
         logger.info("Getting match details from DB")
         _match = get_match_details_from_db(m)
@@ -839,7 +848,7 @@ def _cricket_totals(player_id, m:match.MatchData or int, _type='both', by_inning
             bowling_figures += get_figures_from_scorecard(player_id, m, 'bowl', is_object_id=is_object_id)
         
         except utils.FiguresInDB:
-            pass
+            in_db = True
 
     if _type != 'bowl':
         batting_figures = []
@@ -895,14 +904,14 @@ def _cricket_totals(player_id, m:match.MatchData or int, _type='both', by_inning
             logger.info("Getting batting figures from scorecard")
             batting_figures += get_figures_from_scorecard(player_id, m, 'bat', is_object_id=is_object_id)
         except utils.FiguresInDB:
-            pass
+            in_db = True
     
     try:
         logger.debug("Match ID: %s\nBatting: %s\nBowling: %s",m.match_id, batting_figures, bowling_figures) 
-        return {'bat': batting_figures, 'bowl': bowling_figures, 'date':date,'team':team, 'opposition': opps, 'ground':ground, 'continent':continent, 'match_id': m.match_id}
+        return {'bat': batting_figures, 'bowl': bowling_figures, 'date':date,'team':team, 'opposition': opps, 'ground':ground, 'continent':continent, 'match_id': m.match_id}, in_db
     except AttributeError:
         logger.debug("Match ID: %s\nBatting: %s\nBowling: %s",m, batting_figures, bowling_figures)
-        return {'bat': batting_figures, 'bowl': bowling_figures, 'date':date,'team':team, 'opposition': opps, 'ground':ground, 'continent':continent, 'match_id': m}
+        return {'bat': batting_figures, 'bowl': bowling_figures, 'date':date,'team':team, 'opposition': opps, 'ground':ground, 'continent':continent, 'match_id': m}, in_db
     
 
 def process_text_comms(df:pd.DataFrame, columns = ['dismissalText', 'commentPreTextItems', 'commentTextItems', 'commentPostTextItems', 'commentVideos']):
