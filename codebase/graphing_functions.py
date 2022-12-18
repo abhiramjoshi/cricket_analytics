@@ -191,5 +191,13 @@ def get_animated_career(player_id:str or int, _format:str = 'test', player_age=N
     logger.info('Saving animation to %s', os.path.join(DATA_LOCATION, 'animation_test.mp4'))
     ani.save(os.path.join(DATA_LOCATION, 'animation_test.mp4'), writer=writer, )
 
+def graph_cumulative_dismissals(innings):
+    cum_dismissals = af.get_cumulative_dismissals(innings)
+    cum_dismissals_df = pd.DataFrame(cum_dismissals)
+    fig, ax1 = plt.subplots(figsize=(18,10)) 
+    sns.lineplot(data=cum_dismissals_df)
+
+    return cum_dismissals
+
 if __name__ == "__main__":
     get_animated_career('253802')
