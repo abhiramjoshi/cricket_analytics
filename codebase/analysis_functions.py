@@ -734,14 +734,14 @@ def get_cricket_totals(player_id, matches=None, _type='both', by_innings=False, 
                     stats = {**inning, **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}, **{'type':contr_type}}
                     contributions.append(stats)
                     if match_save:
-                        save_player_stats_to_db(stats, player_id, _match, is_object_id)
+                        save_player_stats_to_db(stats.copy(), player_id, _match, is_object_id)
                     # contributions.append({**contribution['bowl'], **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}})
             else:
                 for i,inning in enumerate(contribution[_type]):
                     stats = {**inning, **{key:contribution[key] for key in contribution.keys() if key not in ['bat', 'bowl']}, **{'type':_type}}
                     contributions.append(stats)
                     if match_save:
-                        save_player_stats_to_db(stats, player_id, _match, is_object_id)
+                        save_player_stats_to_db(stats.copy(), player_id, _match, is_object_id)
         except cricketerrors.MatchNotFoundError:
             logger.warning('Match ID: %s not found', _match)
     return contributions
@@ -1423,6 +1423,7 @@ def graph_shot_runs(shot_stats, full_innings, shot_name, colours=['#5f187f','#f8
     ax1.margins(x=0)
 
     return fig, runs_df
+
 
 def fraction_of_total(shot_stats, full_innings, key):
     perc_of_total = []
