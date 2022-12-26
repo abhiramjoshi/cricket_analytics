@@ -1424,6 +1424,24 @@ def graph_shot_runs(shot_stats, full_innings, shot_name, colours=['#5f187f','#f8
 
     return fig, runs_df
 
+def get_cumulative_dismissals(batting_stats):
+    """Given a dict of batting stats, returns the cumulative dismissal arrays of those stats"""
+    
+    dismissals = {}
+
+    for i,stat in enumerate(batting_stats):
+        
+        try:
+            dismissals[stat['how_out']].append(dismissals[stat['how_out']][-1] + 1)
+        except KeyError:
+            dismissals[stat['how_out']] = [0]*i
+            dismissals[stat['how_out']].append(1)
+
+        for key in dismissals:
+            if key != stat['how_out']:
+                dismissals[key].append(dismissals[key][-1])
+
+    return dismissals
 
 def fraction_of_total(shot_stats, full_innings, key):
     perc_of_total = []
@@ -1518,3 +1536,14 @@ def resolve_scoring_rates_to_ave(scoring_rate):
             logger.debug("Error with scoring rate entry: %s:%s", date,  scoring_rate[date][0])
     
     return scoring_rate_aves_y
+
+def average_innings(contributions):
+    innings_lists = [list(x.batsmanRuns) for x in contributions]
+    average_inning = average_elements_of_list(innings_lists)
+    average_inning_runs = []
+    runs = 0
+    for run in average_inning:
+        runs += run
+        average_inning_runs.append(runs)
+    
+    return average_inning_runs
