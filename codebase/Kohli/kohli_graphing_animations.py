@@ -9,6 +9,7 @@ import pickle
 import pandas as pd
 import json
 
+
 KOHLI_ID = '253802'
 ROOT_PLAYER_ID = '303669'
 WILLIAMSON_PLAYER_ID = '277906'
@@ -27,7 +28,7 @@ kohli_stats = wsf.get_player_career_stats(KOHLI_ID)
 # williamson_totals = af.get_cricket_totals(WILLIAMSON_PLAYER_ID, is_object_id=True)
 # smith_totals = af.get_cricket_totals(SPD_SMITH_ID, is_object_id=True)
 
-class KohliCareer(Scene):
+class KohliCareerGraphShift(Scene):
     def construct(self):
         kohli_matches = wsf.get_player_match_list(KOHLI_ID)
         kohli_out_of_form = kohli_matches[84:]
@@ -88,6 +89,75 @@ class KohliCareer(Scene):
 
         self.wait()
 
+class KohliCareer(Scene):
+
+    def construct(self):
+        kohli_career = gm.CareerGraph(KOHLI_ID)
+        kohli_career_bars = kohli_career.bar_axes.bars.copy()
+        kohli_career.bar_axes.axes.z_index = 1
+        # self.play(Create(kohli_career.bar_axes))
+        self.play(
+            Create(kohli_career.bar_axes.axes),
+            #Create(kohli_career.grid), 
+            Write(kohli_career.not_outs), 
+            Write(kohli_career.title),
+            Create(kohli_career_bars),
+        )
+        for line in kohli_career.average_lines:
+            self.play(Create(line))
+
+        self.wait()
+
+class Top15Batsman(Scene):
+
+    def __init__(self, renderer=None, camera_class=Camera, always_update_mobjects=False, random_seed=None, skip_animations=False):
+        super().__init__(renderer, camera_class, always_update_mobjects, random_seed, skip_animations)
+        Text.set_default(font='sans-serif')
+        with open(os.path.join(DATA_LOCATION, 'best_80_not_cricket_averages_names.json'), 'r') as file:
+            self.best_80 = json.load(file)
+
+        self.top_15 = sorted(self.best_80, key=lambda x: x[1], reverse=True)[:15]
+
+    def construct(self):
+        null_graph = gm.BarChart(
+            values=[0]*15,
+            bar_names=[x[0] for x in self.top_15],
+            y_range=[50,100, 10],
+            bar_colors=[BLUE]*8 + [RED] + [BLUE]*6,
+            x_axis_config={'label_constructor': Text, 'font_size':16},
+            y_axis_config={'label_constructor': Text, 'font_size':16},
+            label_rotation=(3*PI)/2
+        )
+
+        bar_graph = gm.BarChart(
+            values=[x[1] for x in self.top_15],
+            bar_names=[x[0] for x in self.top_15],
+            y_range=[50,100, 10],
+            bar_colors=[BLUE]*8 + [RED] + [BLUE]*6,
+            x_axis_config={'label_constructor': Text, 'font_size':16},
+            y_axis_config={'label_constructor': Text, 'font_size':16},
+            label_rotation=(3*PI)/2
+        )
+
+        bar_graph_no_old = gm.BarChart(
+            values=[x[1] for i,x in enumerate(self.top_15) if i not in [0,5,9]],
+            bar_names=[x[0].rstrip('(') for i,x in enumerate(self.top_15) if i not in [0,5,9]],
+            y_range=[50,70, 4],
+            bar_colors=[BLUE]*6 + [RED] + [BLUE]*5,
+            x_axis_config={'label_constructor': Text, 'font_size':16},
+            y_axis_config={'label_constructor': Text, 'font_size':16},
+            label_rotation=(3*PI)/2
+        )
+
+        title = Text('Best averages over 80 game stretch', font_size=24)
+        title.next_to(bar_graph.axes, UP)
+        bar_labels = bar_graph.get_bar_labels(label_constructor=Text, font_size=16)
+        bar_labels2 = bar_graph_no_old.get_bar_labels(label_constructor=Text, font_size=16)
+        self.play(Create(null_graph), Write(title))
+        self.play(Transform(null_graph, bar_graph, replace_mobject_with_target_in_scene=True))
+        self.play(Write(bar_labels))
+        self.play(Transform(bar_graph, bar_graph_no_old), Transform(bar_labels, bar_labels2))
+        self.wait()
 
 class Fab4Careers(Scene):
     
@@ -144,6 +214,12 @@ class Fab4Careers(Scene):
         self.play(Write(labels))
         self.wait(2)
 
+class Top15BattsmanBar(Scene):
+
+    def __init__(self, renderer=None, camera_class=Camera, always_update_mobjects=False, random_seed=None, skip_animations=False):
+        super().__init__(renderer, camera_class, always_update_mobjects, random_seed, skip_animations)
+
+        pass
 
 class TestMatchScoringRates(Scene):
     
@@ -531,7 +607,8 @@ if __name__ == "__main__":
     # scene = CoverDriveShotFreq()
     # scene = FlickShotFreq()
     # scene = DotBallFreq()
-    scene = KohliCareer()
+    #scene = KohliCareer()
+    scene = Top15Batsman()
     # scene = ShiftedAxis()
     # scene = NumberlineTest()
     # scene = ShotFrequenciesKohli()
