@@ -199,5 +199,36 @@ def graph_cumulative_dismissals(innings):
 
     return cum_dismissals
 
+def innings_graph(player_id, player_innings = None, is_object_id=True):
+    """Takes a number of player innings (ball-by-ball scores) and returns df of cumulative run scored over the inning. We will also add graphs to show shot played"""
+    if not player_innings:
+        player_innings = af.get_player_contributions(player_id, _type='bat', by_innings=True, is_object_id=is_object_id)
+    
+    run_totals = []
+    ball_totals = []
+
+    for inning in player_innings:
+        runs = 0
+        runs_cum = []
+        balls = []
+        for i,row in inning.iterrows():
+            if len(balls) != 0:
+                if not row.batsmanBallsFaced == balls[-1]:
+                    runs += row.batsmanRuns
+                    runs_cum.append(runs)
+                    balls.append(row.batsmanBallsFaced)
+            else:
+                runs += row.batsmanRuns
+                runs_cum.append(runs)
+                balls.append(row.batsmanBallsFaced)
+                
+        run_totals.append(runs_cum)
+        ball_totals.append(balls)
+    
+    run_df = pd.DataFrame(run_totals)
+    run_df = run_df.T
+
+    return run_df
+
 if __name__ == "__main__":
     get_animated_career('253802')
