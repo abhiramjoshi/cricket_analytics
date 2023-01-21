@@ -92,11 +92,23 @@ class CareerGraph(Scene):
         return grid
         
     def get_average_lines(self):
-        x = np.arange(self._x_range[0], self._x_range[1])
+        
         r_a = self.running_ave
+        if r_a[0] == None:
+            x_r_a = np.arange(self._x_range[0], self._x_range[1])[1:]
+            r_a = r_a[1:]        
+        else:
+            x_r_a = np.arange(self._x_range[0], self._x_range[1])
+        
         r_f_a = self.recent_form_ave
-        running_ave = self.bar_axes.plot_line_graph(x, r_a, add_vertex_dots=False, line_color=BLUE)
-        recent_form_ave = self.bar_axes.plot_line_graph(x, r_f_a, add_vertex_dots=False, line_color=RED)
+        if r_f_a[0] == None:
+            x_r_f_a = np.arange(self._x_range[0], self._x_range[1])[1:]
+            r_f_a = r_f_a[1:]
+        else:
+            x_r_f_a = np.arange(self._x_range[0], self._x_range[1])
+        
+        running_ave = self.bar_axes.plot_line_graph(x_r_a, r_a, add_vertex_dots=False, line_color=BLUE)
+        recent_form_ave = self.bar_axes.plot_line_graph(x_r_f_a, r_f_a, add_vertex_dots=False, line_color=RED)
         return [running_ave, recent_form_ave]
         
     def get_title(self):
