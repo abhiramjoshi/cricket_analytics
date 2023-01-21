@@ -89,6 +89,35 @@ class KohliCareerGraphShift(Scene):
 
         self.wait()
 
+class KohliCareerHighlight(Scene):
+
+    def construct(self):
+        kohli_career = gm.CareerGraph(KOHLI_ID)
+        kohli_career_bars = kohli_career.bar_axes.bars.copy()
+        kohli_career_bars_good = kohli_career.bar_axes.bars.copy()[49:129].set_color_by_gradient('#22b525')
+        kohli_career_bars_bad = kohli_career.bar_axes.bars.copy()[141:].set_color_by_gradient('#fc0335')
+        kohli_career.bar_axes.axes.z_index = 1
+        # self.play(Create(kohli_career.bar_axes))
+
+        ##Need to add the averages in a box
+
+        self.play(
+            Create(kohli_career.bar_axes.axes),
+            #Create(kohli_career.grid), 
+            Write(kohli_career.not_outs), 
+            Write(kohli_career.title),
+            Create(kohli_career_bars),
+        )
+        # for line in kohli_career.average_lines:
+        #     self.play(Create(line))
+
+        self.play(
+            Transform(kohli_career_bars[49:129], kohli_career_bars_good),
+            Transform(kohli_career_bars[141:], kohli_career_bars_bad),
+        )
+
+        self.wait()
+
 class KohliCareer(Scene):
 
     def construct(self):
@@ -107,6 +136,71 @@ class KohliCareer(Scene):
             self.play(Create(line))
 
         self.wait()
+
+class KohliCareerGood(Scene):
+    def construct(self):
+        bottom_limit = 49
+        top_limit = 129
+        kohli_matches = wsf.get_player_match_list(KOHLI_ID)
+        kohli_career = gm.CareerGraph(KOHLI_ID)
+        kohli_in_form_career = gm.CareerGraph(KOHLI_ID, match_ids=kohli_matches[28:75], x_range=(bottom_limit, top_limit), numbers_to_include=[50, 60, 70, 80, 90, 100, 110,120])
+        good_form_running_ave = kohli_career.running_ave[bottom_limit:top_limit]
+        good_form_recent_form_ave = kohli_career.recent_form_ave[bottom_limit:top_limit]
+
+        x = np.arange(bottom_limit,top_limit)
+        bfrfl = kohli_in_form_career.bar_axes.plot_line_graph(x, good_form_recent_form_ave, line_color=RED, add_vertex_dots=False)
+        bfra = kohli_in_form_career.bar_axes.plot_line_graph(x, good_form_running_ave, line_color=BLUE, add_vertex_dots=False)
+
+        self.play(
+            Create(kohli_in_form_career.bar_axes),
+            #Create(kohli_career.grid), 
+            Write(kohli_in_form_career.not_outs), 
+            Write(kohli_in_form_career.title)
+        )
+        for line in [bfra, bfrfl]:
+            self.play(Create(line))
+        
+        self.wait()
+
+class KohliCareerODI(Scene):
+
+    def construct(self):
+        kohli_career = gm.CareerGraph(KOHLI_ID, _format='odi')
+        kohli_career_bars = kohli_career.bar_axes.bars.copy()
+        kohli_career.bar_axes.axes.z_index = 1
+        # self.play(Create(kohli_career.bar_axes))
+        self.play(
+            Create(kohli_career.bar_axes.axes),
+            #Create(kohli_career.grid), 
+            Write(kohli_career.not_outs), 
+            Write(kohli_career.title),
+            Create(kohli_career_bars),
+        )
+        for line in kohli_career.average_lines:
+            self.play(Create(line))
+
+        self.wait()
+
+class KohliCareerT20(Scene):
+
+    def construct(self):
+        kohli_career = gm.CareerGraph(KOHLI_ID, _format='t20i')
+        kohli_career_bars = kohli_career.bar_axes.bars.copy()
+        kohli_career.bar_axes.axes.z_index = 1
+        # self.play(Create(kohli_career.bar_axes))
+        self.play(
+            Create(kohli_career.bar_axes.axes),
+            #Create(kohli_career.grid), 
+            Write(kohli_career.not_outs), 
+            Write(kohli_career.title),
+            Create(kohli_career_bars),
+        )
+        for line in kohli_career.average_lines:
+            self.play(Create(line))
+
+        self.wait()
+
+        
 
 class Top15Batsman(Scene):
 
@@ -562,6 +656,30 @@ class ShotFrequenciesKohli(Scene):
             self.play(Create(line))
         self.wait()
 
+class KohliDismissals(Scene):
+    def construct(self):
+        test_match_list = wsf.get_player_match_list(KOHLI_ID, _format='test')
+        kohli_totals = af.get_cricket_totals(int(KOHLI_ID), matches=test_match_list, _type='bat', by_innings=True, is_object_id=True)
+        cum_dismissals = af.get_cumulative_dismissals(kohli_totals)
+        x = list(range(len(cum_dismissals[list(cum_dismissals.keys())[0]]))) 
+        dismissal_graph = gm.LineGraph(
+            x_values = x,
+            y_values=[cum_dismissals[y] for y in cum_dismissals],
+            x_length=10,
+            y_length=5,
+            only_create_lines=True
+        )
+
+        legend = dismissal_graph.get_legend([k.replace('_', ' ') for k in cum_dismissals])
+        all_lines = dismissal_graph.lines
+
+        self.play(Write(dismissal_graph))
+        for line in all_lines:
+            self.play(Create(line))
+        self.play(Create(legend))
+        self.wait()
+    
+
 class ScoringRateInInning(Scene):
     pass
 
@@ -607,8 +725,13 @@ if __name__ == "__main__":
     # scene = CoverDriveShotFreq()
     # scene = FlickShotFreq()
     # scene = DotBallFreq()
-    #scene = KohliCareer()
-    scene = Top15Batsman()
+    # scene = KohliCareer()
+    # scene = KohliCareerGood()
+    # scene = KohliCareerHighlight()
+    # scene = KohliCareerODI()
+    scene = KohliCareerT20()
+    # scene = KohliDismissals()
+    # scene = Top15Batsman()
     # scene = ShiftedAxis()
     # scene = NumberlineTest()
     # scene = ShotFrequenciesKohli()
