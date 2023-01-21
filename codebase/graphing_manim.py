@@ -681,8 +681,8 @@ class LineAnimations(Scene):
 
     def construct(self):
         line = Line()
-
-        self.play(Create(line))
+        title = Text("TitleScreen")
+        self.play(Create(line), Write(title))
         self.wait()
 
 if __name__ == "__main__":
@@ -695,11 +695,11 @@ if __name__ == "__main__":
     # scene = ScatterPlotScene()
     # scene.render()
 
-    scene = LineGraphScene()
-    scene.render()
-
-    # scene = LineAnimations()
+    # scene = LineGraphScene()
     # scene.render()
+
+    scene = LineAnimations()
+    scene.render()
 
     # scene = LineGraphExample()
     # scene.render()
