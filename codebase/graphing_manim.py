@@ -6,6 +6,7 @@ import codebase.web_scrape_functions as wsf
 import pandas as pd
 from typing import Iterable, MutableSequence, Sequence
 config.quality = 'low_quality'
+DEFAULT_AXIS_COLOUR = '#0A273B'
 
 class CareerGraph(Scene):
     def __init__(self, player_id, renderer=None, camera_class=Camera, always_update_mobjects=False, random_seed=None, skip_animations=False,
@@ -69,7 +70,7 @@ class CareerGraph(Scene):
                'include_ticks':False,
                'decimal_number_config':{'num_decimal_places': 0}
             },
-            bar_colors=['#003f5c']*len(x)
+            bar_colors=['#95BF74']*len(x)
         )
 
         return axes
@@ -107,8 +108,8 @@ class CareerGraph(Scene):
         else:
             x_r_f_a = np.arange(self._x_range[0], self._x_range[1])
         
-        running_ave = self.bar_axes.plot_line_graph(x_r_a, r_a, add_vertex_dots=False, line_color=BLUE)
-        recent_form_ave = self.bar_axes.plot_line_graph(x_r_f_a, r_f_a, add_vertex_dots=False, line_color=RED)
+        running_ave = self.bar_axes.plot_line_graph(x_r_a, r_a, add_vertex_dots=False, line_color='#FE5F55')
+        recent_form_ave = self.bar_axes.plot_line_graph(x_r_f_a, r_f_a, add_vertex_dots=False, line_color='#FAA916')
         return [running_ave, recent_form_ave]
         
     def get_title(self):
@@ -366,11 +367,11 @@ class LineGraph(Axes):
         y_length: float | None = None,
         x_length: float | None = None,
         line_colours: Iterable[str] = [
-            "#003f5c",
-            "#58508d",
-            "#bc5090",
-            "#ff6361",
-            "#ffa600",
+            "#FE5F55", #red
+            "#7392B7", #blue
+            "#FAA916", #yellow
+            "#95BF74", #green
+            "#28536B", #darkblue
         ],
         only_create_lines=False,
         x_axis_is_years=False,
@@ -461,8 +462,19 @@ class LineGraph(Axes):
         self._add_lines(only_create=only_create_lines)
         self.x_axis.add_numbers()
         self.y_axis.add_numbers()
+        if kwargs.get('axis_colours', None):
+            self.axes.set_color(kwargs.pop('axis_colour'))
+        else:
+            self.axes.set_color(DEFAULT_AXIS_COLOUR)
 
     def _create_line(self, y, i, line_config = {}):
+        def y_exists(y_value, i):
+            try:
+                if y[i] is not None:
+                    return True
+            except IndexError:
+                return False
+
         if len(self.line_colours) == len(self.y_values):
             colour = self.line_colours[i]
         else:
@@ -470,7 +482,7 @@ class LineGraph(Axes):
 
         add_vertex_dots = self.line_config.pop('add_vertex_dots', False)
 
-        x_values = [x for i,x in enumerate(self.x_values) if y[i] is not None]
+        x_values = [x for i,x in enumerate(self.x_values) if y_exists(y, i)]
         y = [_y for _y in y if _y is not None]
         line = self.plot_line_graph(
             x_values=x_values,
