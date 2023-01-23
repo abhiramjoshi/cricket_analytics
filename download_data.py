@@ -2,8 +2,12 @@ import codebase.analysis_functions as af
 import codebase.web_scrape_functions as wsf
 import pandas as pd
 import re
+import os
 from utils import logger
 from pprint import pprint
+import pickle
+from utils import DATA_LOCATION
+KOHLI_ID = '253802'
 
 # top_players = wsf.read_statsguru('https://stats.espncricinfo.com/ci/engine/stats/index.html?class=1;filter=advanced;orderby=batting_average;qualmin1=30;qualval1=matches;template=results;type=batting', table_name='Overall figures')
 # top_players = pd.DataFrame(top_players[0])
@@ -19,21 +23,24 @@ from pprint import pprint
 # logger.info("Isolating player IDs")
 # players = [re.match('/ci/content/player/(\d+)\.html', player[1])[1] for player in players]
 
-error_players = []
-for player in ['373696']:
-    try:
-        logger.info("Grabbing match totals for player %s for the purposes of saving to DB")
-        totals = af.get_cricket_totals(int(player), _type='bat', by_innings=True, is_object_id=True, save=True)
-        logger.debug(totals)
-    except Exception as e:
-        logger.error("Error with player %s", player)
+# error_players = []
+# for player in ['373696']:
+#     try:
+#         logger.info("Grabbing match totals for player %s for the purposes of saving to DB")
+#         totals = af.get_cricket_totals(int(player), _type='bat', by_innings=True, is_object_id=True, save=True)
+#         logger.debug(totals)
+#     except Exception as e:
+#         logger.error("Error with player %s", player)
         
-        logger.exception("Catching literally any error and proceeding so that I can run this overnight, error this time was")
-        error_players.append(player)
+#         logger.exception("Catching literally any error and proceeding so that I can run this overnight, error this time was")
+#         error_players.append(player)
 
-logger.info("Data collection task completed")
-logger.info("Error players are %s", str(error_players))
-
+# logger.info("Data collection task completed")
+# logger.info("Error players are %s", str(error_players))
+kohli_matches = wsf.get_player_match_list(KOHLI_ID)
+kohli_comms = af.get_player_contributions(KOHLI_ID, kohli_matches, _type='bat', by_innings=True, is_object_id=True)
+with open(os.path.join(DATA_LOCATION, 'kohli_comms.p')) as _file:
+    pickle.dump(kohli_comms, _file)
 # result = {}
 # for player in top_players.Players:
 #     match_list = wsf.player_match_list(player)

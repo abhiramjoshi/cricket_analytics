@@ -22,6 +22,13 @@ PLAYER_IDS = [
     SPD_SMITH_ID
 ]
 
+#Default background colour to dark
+config.background_color = '#FFF1D0'
+#Default axes colour to dark
+Axes.set_default(color='#0A273B')
+BarChart.set_default(bar_colors=['#FAA916', '#FE5F55', '#95BF74', '#7392B7', '#28536B'])
+
+
 kohli_stats = wsf.get_player_career_stats(KOHLI_ID)
 # kohli_totals = af.get_cricket_totals(KOHLI_ID, is_object_id=True)
 # root_totals = af.get_cricket_totals(ROOT_PLAYER_ID, is_object_id=True)
@@ -275,12 +282,14 @@ class Fab4Careers(Scene):
         linegraph = gm.LineGraph(
             x_values=self._x_values,
             y_values=self._y_values,
+            line_colours=['#FAA916', '#FE5F55', '#95BF74', '#7392B7'],
             # y_range=[25,75],
             y_length=5,
             x_length=10,
-            only_create_lines=True
+            only_create_lines=True,
         )
 
+        linegraph.axes.set_color('#0A273B')
         labels=linegraph.get_line_labels(
             values=[
                 'Kohli',
@@ -303,7 +312,7 @@ class Fab4Careers(Scene):
         lines = linegraph.lines
         self.play(Write(linegraph))
         for line in lines:
-            self.play(Write(line))
+            self.play(Create(line))
             self.wait(1)
         self.play(Write(labels))
         self.wait(2)
@@ -639,11 +648,11 @@ class ShotFrequenciesKohli(Scene):
                 (flick_line.y_values[0], {'dashed':True}),
                 
             ],
-            line_colours=[
-                "#003f5c",
-                "#ff6361",
-                "#bc5090",
-            ],
+            # line_colours=[
+            #     "#003f5c",
+            #     "#ff6361",
+            #     "#bc5090",
+            # ],
             x_length=10,
             y_length=5,
             only_create_lines=True
@@ -679,9 +688,107 @@ class KohliDismissals(Scene):
         self.play(Create(legend))
         self.wait()
     
+class KohliCenturiesBreakdown(Scene):
+    def construct(self):
+        Text.set_default(font='sans-serif')
+        kohli_innings = af.get_cricket_totals(KOHLI_ID, _type='bat', by_innings=True, is_object_id=True)
+        good_form_innings = kohli_innings[141-36:141]
+        bad_form_innings = kohli_innings[141:]
+
+        good_form_centuries = [inning for inning in good_form_innings if inning['runs'] > 99]
+        bad_form_centuries = [inning for inning in bad_form_innings if inning['runs'] > 99]
+
+        century_breakdown = {}
+        century_dict = {'good_form': good_form_centuries, 'bad_form':bad_form_centuries}
+        combined_centuries = {}
+        for centuries in century_dict:
+            home = []
+            away = []
+            for century in century_dict[centuries]:
+                if century['continent'] == 'Asia':
+                    if century['ground'] not in [847]:
+                        home.append(century)
+                    else:
+                        away.append(century)
+                else:
+                    away.append(century)
+                
+            century_breakdown[f'{centuries}_home']  = len(home)
+            century_breakdown[f'{centuries}_away']  = len(away)
+            combined_centuries[centuries] = len(home) + len(away)
+        
+        empty_graph = gm.BarChart(
+            values=[0 for x in combined_centuries],
+            bar_names=['Good Form', 'Bad Form'],
+            x_axis_config={'label_constructor': Text, 'font_size':16},
+            y_axis_config={'label_constructor': Text, 'font_size':16, 'decimal_number_config':{'num_decimal_places': 0}},
+            # label_rotation=(3*PI)/2,
+            y_range=[0, 8, 1],
+            x_length=10,
+            y_length=5
+        )
+
+        century_graph = gm.BarChart(
+            values=[combined_centuries[x] for x in combined_centuries],
+            bar_names=['Good Form', 'Bad Form'],
+            x_axis_config={'label_constructor': Text, 'font_size':16},
+            y_axis_config={'label_constructor': Text, 'font_size':16, 'decimal_number_config':{'num_decimal_places': 0}},
+            # label_rotation=(3*PI)/2,
+            y_range=[0, 8, 1],
+            x_length=10,
+            y_length=5
+        )
+
+        century_graph_breakdown = gm.BarChart(
+            values=[century_breakdown[x] for x in century_breakdown],
+            bar_names=['Good Home', 'Good Away', 'Bad Home', 'Bad Away'],
+            x_axis_config={'label_constructor': Text, 'font_size':16},
+            y_axis_config={'label_constructor': Text, 'font_size':16, 'decimal_number_config':{'num_decimal_places': 0}},
+            # label_rotation=(3*PI)/2,
+            y_range=[0, 5, 1],
+            x_length=10,
+            y_length=5
+        )
+
+        title = Text('Kohli Centuries', font_size=24)
+        title.next_to(century_graph.axes, UP)
+        bar_labels = century_graph.get_bar_labels(label_constructor=Text, font_size=16)
+        bar_labels2 = century_graph_breakdown.get_bar_labels(label_constructor=Text, font_size=16)
+        self.play(Create(empty_graph), Write(title))
+        self.play(Transform(empty_graph, century_graph, replace_mobject_with_target_in_scene=True))
+        self.play(Write(bar_labels))
+        self.play(Transform(century_graph, century_graph_breakdown), Transform(bar_labels, bar_labels2))
+        self.wait()
 
 class ScoringRateInInning(Scene):
-    pass
+    def construct(self):
+        Text.set_default(font='sans-serif')
+        kohli_matches = wsf.get_player_match_list(KOHLI_ID)
+        kohli_innings = af.get_player_contributions(KOHLI_ID, matches=kohli_matches, _type='bat', by_innings=True, is_object_id=True)
+        pre_average_inning = af.average_innings(kohli_innings[:141])
+        post_average_inning = af.average_innings(kohli_innings[141:])
+        pre_x = list(range(len(pre_average_inning)))
+        post_x = list(range(len(post_average_inning)))
+
+        speed_of_innings = gm.LineGraph(
+            x_values=pre_x,
+            y_values=[
+                pre_average_inning,
+                post_average_inning
+            ],
+            only_create_lines=True,
+            x_length=10,
+            y_length=5
+        )
+
+        self.play(
+            Create(speed_of_innings)
+        )
+        for line in speed_of_innings.lines:
+            self.play(Create(line))
+
+        self.wait()
+        
 
 class KohliDotBalls(Scene):
     pass
@@ -729,7 +836,9 @@ if __name__ == "__main__":
     # scene = KohliCareerGood()
     # scene = KohliCareerHighlight()
     # scene = KohliCareerODI()
-    scene = KohliCareerT20()
+    # scene = KohliCareerT20()
+    scene = KohliCenturiesBreakdown()
+    # scene = ScoringRateInInning()
     # scene = KohliDismissals()
     # scene = Top15Batsman()
     # scene = ShiftedAxis()
