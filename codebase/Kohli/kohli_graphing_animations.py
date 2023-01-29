@@ -145,7 +145,9 @@ class KohliCareer(Scene):
         self.wait()
 
 class KohliCareerGood(Scene):
-    def construct(self):
+    
+    @staticmethod
+    def get_good_period_career():
         bottom_limit = 49
         top_limit = 129
         kohli_matches = wsf.get_player_match_list(KOHLI_ID)
@@ -155,8 +157,12 @@ class KohliCareerGood(Scene):
         good_form_recent_form_ave = kohli_career.recent_form_ave[bottom_limit:top_limit]
 
         x = np.arange(bottom_limit,top_limit)
-        bfrfl = kohli_in_form_career.bar_axes.plot_line_graph(x, good_form_recent_form_ave, line_color=RED, add_vertex_dots=False)
-        bfra = kohli_in_form_career.bar_axes.plot_line_graph(x, good_form_running_ave, line_color=BLUE, add_vertex_dots=False)
+        bfrfl = kohli_in_form_career.bar_axes.plot_line_graph(x, good_form_recent_form_ave, line_color='#FE5F55', add_vertex_dots=False)
+        bfra = kohli_in_form_career.bar_axes.plot_line_graph(x, good_form_running_ave, line_color='#FAA916', add_vertex_dots=False)
+        return kohli_in_form_career, bfrfl, bfra
+    
+    def construct(self):
+        kohli_in_form_career, bfrfl, bfra = self.get_good_period_career()
 
         self.play(
             Create(kohli_in_form_career.bar_axes),
@@ -168,6 +174,93 @@ class KohliCareerGood(Scene):
             self.play(Create(line))
         
         self.wait()
+
+class KohliCenturiesGood(Scene):
+    
+    @staticmethod
+    def get_good_centuries():
+        #Text.set_default(font='sans-serif')
+        kohli_innings = af.get_cricket_totals(KOHLI_ID, _type='bat', by_innings=True, is_object_id=True)
+        good_form_innings = kohli_innings[141-36:141]
+
+        good_form_centuries = [inning for inning in good_form_innings if inning['runs'] > 99]
+
+        century_breakdown = {}
+        century_dict = {'good_form': good_form_centuries}
+        combined_centuries = {}
+        for centuries in century_dict:
+            home = []
+            away = []
+            for century in century_dict[centuries]:
+                if century['continent'] == 'Asia':
+                    if century['ground'] not in [847]:
+                        home.append(century)
+                    else:
+                        away.append(century)
+                else:
+                    away.append(century)
+                
+            century_breakdown[f'{centuries}_home']  = len(home)
+            century_breakdown[f'{centuries}_away']  = len(away)
+            combined_centuries[centuries] = len(home) + len(away)
+        
+        empty_graph = gm.BarChart(
+            values=[0 for x in combined_centuries],
+            bar_names=['Total Centuries'],
+            x_axis_config={'label_constructor': Text},
+            y_axis_config={'label_constructor': Text, 'decimal_number_config':{'num_decimal_places': 0}},
+            # label_rotation=(3*PI)/2,
+            y_range=[0, 8, 1],
+            x_length=10,
+            y_length=5
+        )
+
+        century_graph_breakdown = gm.BarChart(
+            values=[century_breakdown[x] for x in century_breakdown],
+            bar_names=['Good Home', 'Good Away'],
+            x_axis_config={'label_constructor': Text},
+            y_axis_config={'label_constructor': Text, 'decimal_number_config':{'num_decimal_places': 0}},
+            # label_rotation=(3*PI)/2,
+            y_range=[0, 5, 1],
+            x_length=10,
+            y_length=5
+        )
+
+        return century_graph_breakdown
+
+    def construct(self):
+        pass
+
+class KohliGoodFormCareerToCenturies(Scene):
+    
+    def construct(self):
+        kohli_in_form_career, bfrfl, bfra = KohliCareerGood().get_good_period_career()
+        century_graph = KohliCenturiesGood().get_good_centuries()
+        # kohli_in_form_career_bars = kohli_in_form_career.bar_axes.bars.copy()
+        # kohli_in_form_career.bar_axes.bars = None
+
+        self.play(
+            Create(kohli_in_form_career.bar_axes),
+            #Create(kohli_in_form_career_bars),
+            Create(kohli_in_form_career.not_outs),
+            Create(kohli_in_form_career.title)
+        )
+
+        for line in [bfra, bfrfl]:
+            self.play(Create(line))
+
+        self.wait()
+
+        self.play(
+            #Uncreate(kohli_in_form_career_bars),
+            Transform(kohli_in_form_career.bar_axes, century_graph),
+            Uncreate(kohli_in_form_career.not_outs),
+            Uncreate(kohli_in_form_career.title),
+            Uncreate(bfra), Uncreate(bfrfl)
+        )
+
+        self.wait()
+
 
 class KohliCareerODI(Scene):
 
@@ -837,7 +930,7 @@ if __name__ == "__main__":
     # scene = KohliCareerHighlight()
     # scene = KohliCareerODI()
     # scene = KohliCareerT20()
-    scene = KohliCenturiesBreakdown()
+    # scene = KohliCenturiesBreakdown()
     # scene = ScoringRateInInning()
     # scene = KohliDismissals()
     # scene = Top15Batsman()
@@ -845,5 +938,6 @@ if __name__ == "__main__":
     # scene = NumberlineTest()
     # scene = ShotFrequenciesKohli()
     # scene = Fab4Careers()
+    scene = KohliGoodFormCareerToCenturies()
     scene.render()
 
