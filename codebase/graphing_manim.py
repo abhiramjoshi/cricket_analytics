@@ -5,12 +5,13 @@ import codebase.analysis_functions as af
 import codebase.web_scrape_functions as wsf
 import pandas as pd
 from typing import Iterable, MutableSequence, Sequence
-config.quality = 'low_quality'
+config.quality = 'production_quality'
+# config.quality = 'low_quality'
 DEFAULT_AXIS_COLOUR = '#0A273B'
 
 class CareerGraph(Scene):
     def __init__(self, player_id, renderer=None, camera_class=Camera, always_update_mobjects=False, random_seed=None, skip_animations=False,
-                _format = 'test', _type='bat', player_age=None, dates=None, window_size=10, match_ids=None, x_range=None, y_range=None, numbers_to_include=None):
+                _format = 'test', _type='bat', player_age=None, dates=None, window_size=10, match_ids=None, x_range=None, y_range=None, numbers_to_include=None, x_length=10, y_length=5):
         super().__init__(renderer, camera_class, always_update_mobjects, random_seed, skip_animations)
         
         if player_age:
@@ -51,11 +52,16 @@ class CareerGraph(Scene):
         else:
             self.numbers_to_include = np.arange(self._x_range[0],self._x_range[1], self._x_range[2])
 
+        self.x_length = x_length
+        self.y_length = y_length
         self.bar_axes = self.get_bars_chart(x_range)
         self.not_outs = self.get_not_outs()
         self.average_lines = self.get_average_lines()
         self.title = self.get_title()
         self.grid = self.make_grid()
+        self.x_axis_label = Text("Innings", color='#0A273B', font_size=20).next_to(self.bar_axes.axes, DOWN)
+        self.y_axis_label = Text("Runs", color='#0A273B', font_size=20).next_to(self.bar_axes.axes, LEFT).rotate(PI/2)
+        self.axis_labels = VGroup(self.x_axis_label, self.y_axis_label)
 
     def get_bars_chart(self, x_range=None):
         x = np.arange(len(self.running_ave))
@@ -63,21 +69,25 @@ class CareerGraph(Scene):
             values=self.innings_df.runs,
             y_range=(self._y_range[0], self._y_range[1], self._y_range[2]),
             x_range=x_range,
+            y_length=self.y_length,
+            x_length=self.x_length,
             # x_range=(self._x_range[0], self._x_range[1], self._x_range[2])
             axis_config={"include_numbers": True, 'decimal_number_config':{'num_decimal_places': 0}},
             x_axis_config={
-               "numbers_to_include": self.numbers_to_include,
-               'include_ticks':False,
-               'decimal_number_config':{'num_decimal_places': 0}
+                "label_constructor": Text,
+                "numbers_to_include": self.numbers_to_include,
+                'include_ticks':False,
+                'decimal_number_config':{'num_decimal_places': 0},
             },
-            bar_colors=['#95BF74']*len(x)
+            y_axis_config={'label_constructor': Text, 'font_size':20},
+            bar_colors=['#7392B7']*len(x)
         )
 
         return axes
 
     def get_not_outs(self):
         constr_args = {'radius':self.bar_axes.bars[0].width/4, 'fill_opacity':1, 'no_val':True}
-        _not_outs = self.bar_axes.get_bar_labels(color=RED, constr_args=constr_args, label_constructor=Circle, buff=SMALL_BUFF)
+        _not_outs = self.bar_axes.get_bar_labels(color='#95BF74', constr_args=constr_args, label_constructor=Circle, buff=SMALL_BUFF)
         not_outs = VGroup()
         n = [x for i,x in enumerate(_not_outs) if self.innings_df.not_out.iloc[i]]
         for i in n:
@@ -108,8 +118,8 @@ class CareerGraph(Scene):
         else:
             x_r_f_a = np.arange(self._x_range[0], self._x_range[1])
         
-        running_ave = self.bar_axes.plot_line_graph(x_r_a, r_a, add_vertex_dots=False, line_color='#FE5F55')
-        recent_form_ave = self.bar_axes.plot_line_graph(x_r_f_a, r_f_a, add_vertex_dots=False, line_color='#FAA916')
+        running_ave = self.bar_axes.plot_line_graph(x_r_a, r_a, add_vertex_dots=False, line_color='#FAA916')
+        recent_form_ave = self.bar_axes.plot_line_graph(x_r_f_a, r_f_a, add_vertex_dots=False, line_color='#FE5F55')
         return [running_ave, recent_form_ave]
         
     def get_title(self):
@@ -247,7 +257,7 @@ class ScatterPlot(Axes):
         elif len(y_range) == 2:
             y_range = [*y_range, round(max(self.values, key=lambda x:x[1])[1] / y_length, 2)]
         
-        y_axis_config = {"font_size": 24, "label_constructor": Tex}
+        y_axis_config = {"font_size": 12, "label_constructor": Text}
         self._update_default_configs(
             (y_axis_config,), (kwargs.pop("y_axis_config", None),)
         )
@@ -288,6 +298,7 @@ class ScatterPlot(Axes):
             x_length=x_length,
             y_length=y_length,
             x_axis_config=x_axis_config,
+            y_axis_config=y_axis_config,
             tips=kwargs.pop("tips", False),
             **kwargs,
         )
@@ -368,10 +379,10 @@ class LineGraph(Axes):
         x_length: float | None = None,
         line_colours: Iterable[str] = [
             "#FE5F55", #red
+            "#28536B", #darkblue
             "#7392B7", #blue
             "#FAA916", #yellow
             "#95BF74", #green
-            "#28536B", #darkblue
         ],
         only_create_lines=False,
         x_axis_is_years=False,
@@ -416,7 +427,7 @@ class LineGraph(Axes):
         elif len(y_range) == 2:
             y_range = [*y_range, round((y_range[1]-y_range[0]) / y_length, 2)]
         
-        y_axis_config = {"font_size": 24, "label_constructor": Tex}
+        y_axis_config = {"font_size": 20, "label_constructor": Text}
         self._update_default_configs(
             (y_axis_config,), (kwargs.pop("y_axis_config", None),)
         )
@@ -442,7 +453,7 @@ class LineGraph(Axes):
         decimal_number_config = {}
         if x_axis_is_years:
             decimal_number_config = {'group_with_commas':False, 'num_decimal_places':0}
-        x_axis_config = {"font_size": 24, "label_constructor": Tex, 'decimal_number_config':decimal_number_config}
+        x_axis_config = {"font_size": 24, "label_constructor": Text, 'decimal_number_config':decimal_number_config}
         self._update_default_configs(
             (x_axis_config,), (kwargs.pop("x_axis_config", None),)
         )
@@ -455,6 +466,7 @@ class LineGraph(Axes):
             x_length=x_length,
             y_length=y_length,
             x_axis_config=x_axis_config,
+            y_axis_config=y_axis_config,
             tips=kwargs.pop("tips", False),
             **kwargs,
         )
@@ -493,8 +505,10 @@ class LineGraph(Axes):
 
         vertices = line['vertex_dots']
         line_group = VGroup()
-        if line_config.pop('dashed', False):
+        if line_config.get('dashed', False):
+            dashed = line_config.pop('dashed')
             line_contructor = DashedLine
+            
         else:
             line_contructor = Line
 
@@ -503,6 +517,11 @@ class LineGraph(Axes):
         
         if not add_vertex_dots:
             line.remove('vertex_dots')
+
+        try:
+            line_config['dashed'] = dashed
+        except UnboundLocalError:
+            pass
 
         line['line_graph'] = line_group
 
@@ -551,7 +570,8 @@ class LineGraph(Axes):
     
     def _get_line_final_value_pos(self, i):
         line = self.y_values[i]
-        x = len(line) - 1
+        #x = len(line) - 1
+        x = len(line)
         y = line[-1]
         point = self.c2p(x,y)
         return point
@@ -559,10 +579,10 @@ class LineGraph(Axes):
     def get_legend(
         self,
         values,
-        colour = None,
+        colour = '#0A273B',
         font_size = 24,
         buff = MED_SMALL_BUFF,
-        label_constructor = Tex,
+        label_constructor = Text,
         pos = RIGHT,
         **kwargs
     ):
@@ -588,7 +608,8 @@ class LineGraph(Axes):
             #create a line with the same style as the line on the graph
             line_colour = self.lines[i]['line_graph'][0].color
             line_config = self.line_configs[i]
-            if line_config.pop('dashed', False):
+            if line_config.get('dashed', False):
+                dashed = line_config.pop('dashed', False)
                 line_contructor = DashedLine
             else:
                 line_contructor = Line
@@ -597,12 +618,16 @@ class LineGraph(Axes):
             line = line_contructor(start=start, end=end, color=line_colour, **line_config)
             line.next_to(label, LEFT)
             lines.add(line)
-        
+            try:
+                line_config['dashed'] = dashed
+            except UnboundLocalError:
+                pass
+
         legend.add(lines)
 
         legend_border_height = legend.get_top()[1] - legend.get_bottom()[1] + (2*MED_SMALL_BUFF)
         legend_border_width = legend.get_right()[0] - legend.get_left()[0] + lines[0].width
-        legend_border = Rectangle(height=legend_border_height, width=legend_border_width)
+        legend_border = Rectangle(height=legend_border_height, width=legend_border_width, color=colour)
         legend_border.move_to(legend.get_center())
         legend.add(legend_border)
         
@@ -616,7 +641,7 @@ class LineGraph(Axes):
         colour = None,
         font_size = 24,
         buff = MED_SMALL_BUFF,
-        label_constructor = Tex,
+        label_constructor = Text,
         pos = RIGHT,
         **kwargs
     ):
@@ -628,7 +653,7 @@ class LineGraph(Axes):
 
         if len(values) != len(self.lines):
             if len(values) < len(self.lines):
-                values += ['']*(len(self.lines) - len(values))
+                values += [' ']*(len(self.lines) - len(values))
             else:
                 raise Exception('Too many values provided for number of lines in plot')
         _values = values 
