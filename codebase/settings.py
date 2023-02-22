@@ -9,7 +9,7 @@ ANALYSIS = os.path.join(BASE_PATH, "data", 'analysis_data')
 SCORECARDS = os.path.join(BASE_PATH, "data", "scorecards")
 CAREERS = os.path.join(BASE_PATH, "data", "careers")
 LABEL_DATA = os.path.join(BASE_PATH, "data", "labelled_data")
-
+MEDIA_LOCATION = os.path.join(BASE_PATH, "media", "highlights")
 DATABASE_TYPE = 'sqlite'
 DATABASE_LOCATION = os.path.join(BASE_PATH, 'data', 'cricket_data.db')
 
@@ -23,7 +23,8 @@ paths = [
     ANALYSIS,
     SCORECARDS,
     CAREERS,
-    LABEL_DATA
+    LABEL_DATA,
+    MEDIA_LOCATION
 ]
 
 for _path in paths:
