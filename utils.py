@@ -15,6 +15,7 @@ from copy import deepcopy
 import pickle
 from codebase.settings import DATA_LOCATION
 import configparser
+import functools
 
 config = configparser.ConfigParser()
 config.read('.config')
@@ -294,3 +295,14 @@ def check_if_ipython():
 def object_as_dict(obj):
     return {c.key: getattr(obj, c.key)
             for c in inspect(obj).mapper.column_attrs}
+
+def handle_no_json(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            value = func(*args, **kwargs)
+            return value
+        
+        except KeyError:
+            return None
+    return wrapper
