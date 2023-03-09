@@ -10,7 +10,7 @@ from codebase.match_data import MatchData
 from pprint import pprint
 
 TEST_MATCH_ID = 518952
-OLDEST_MATCH_ID = '62396'
+OLDEST_MATCH_ID = '454284'
 
 def test_full_comms_grab(matchId):
     m = MatchData(match_id=matchId)
@@ -35,9 +35,9 @@ def print_comms_data():
 if __name__ == '__main__':
     start = timeit.default_timer()
     #test_full_comms_grab(TEST_MATCH_ID)
-    M = MatchData(OLDEST_MATCH_ID, no_comms=True)
+    M = MatchData(OLDEST_MATCH_ID)
     # print_comms_data()
-
+    print(M)
     stop = timeit.default_timer()
     print('Time: ', start-stop)
     
