@@ -12,6 +12,8 @@ class MatchData(Match):
         super().__init__(int(match_id), try_local, serialize, save)
         self.all_players = self.team_1_players + self.team_2_players
         self.codified_result = self.interpret_match_result()
+        if not self.innings_list:
+            self.innings_list = self.innings
         if not no_comms:
             self.detailed_comms_url = DETAILED_COMMS_BASE_URL.replace('{seriesid}', str(self.series_id)).replace('{matchid}', str(self.match_id))
             self.full_comms = self.get_detailed_comms_faster(try_local = try_local, save=save, serialize=serialize)
@@ -19,8 +21,7 @@ class MatchData(Match):
             self.second_innings = self.get_innings_comms(innings = 2)
             self.third_innings = self.get_innings_comms(innings = 3)
             self.fourth_innings = self.get_innings_comms(innings = 4)
-        if not self.innings_list:
-            self.innings_list = self.innings
+        
 
     def get_detailed_comms_faster(self, try_local=True, save=True, serialize=True):
         """
